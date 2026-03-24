@@ -1,101 +1,137 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Search } from "lucide-react";
+import { TeamCard } from "@/components/TeamCard";
+import { TicketDrawer } from "@/components/TicketDrawer";
+import { SearchBar } from "@/components/SearchBar";
+import { teamMembers, tickets, sprint, isStale } from "@/lib/mock-data";
+import { Ticket, TicketStatus, TeamMemberWithTickets } from "@/lib/types";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [expandedMembers, setExpandedMembers] = useState<Set<string>>(
+    new Set()
+  );
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const membersWithTickets: TeamMemberWithTickets[] = useMemo(() => {
+    return teamMembers.map((member) => {
+      const memberTickets = tickets.filter(
+        (t) => t.assigneeId === member.id
+      );
+      const sprintTickets = memberTickets.filter((t) => !t.isL2);
+      const l2Tickets = memberTickets.filter((t) => t.isL2);
+      const staleCount = memberTickets.filter((t) => isStale(t)).length;
+      return { ...member, sprintTickets, l2Tickets, staleCount };
+    });
+  }, []);
+
+  const toggleMember = useCallback((id: string) => {
+    setExpandedMembers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleTicketSelect = useCallback((ticket: Ticket) => {
+    setSelectedTicket(ticket);
+  }, []);
+
+  const handleStatusChange = useCallback(
+    (ticket: Ticket, status: TicketStatus) => {
+      // No-op for Phase 1 — will call API in Phase 2
+      void ticket;
+      void status;
+    },
+    []
+  );
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Top Bar */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between h-16 px-6">
+          <h1 className="text-lg font-bold tracking-tight shrink-0">
+            Standup Dashboard
+          </h1>
+
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors w-full max-w-md mx-6"
           >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+            <Search className="h-4 w-4 shrink-0" />
+            <span className="text-sm">Search tickets...</span>
+            <kbd className="ml-auto text-xs bg-background px-2 py-0.5 rounded border font-mono">
+              /
+            </kbd>
+          </button>
+
+          <div className="text-right shrink-0">
+            <p className="text-sm font-medium">{sprint.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
+            </p>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
+          {membersWithTickets.map((member) => (
+            <TeamCard
+              key={member.id}
+              member={member}
+              isExpanded={expandedMembers.has(member.id)}
+              onToggle={() => toggleMember(member.id)}
+              onTicketSelect={handleTicketSelect}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          ))}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      {searchOpen && (
+        <SearchBar
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          tickets={tickets}
+          onSelect={handleTicketSelect}
+        />
+      )}
+
+      <TicketDrawer
+        ticket={selectedTicket}
+        teamMembers={teamMembers}
+        onClose={() => setSelectedTicket(null)}
+        onStatusChange={handleStatusChange}
+      />
     </div>
   );
 }
