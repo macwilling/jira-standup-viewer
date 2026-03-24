@@ -1,6 +1,5 @@
 "use client";
 
-import { Flame } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -18,10 +17,12 @@ export function StaleIndicator({
 
   return (
     <Tooltip>
-      <TooltipTrigger className="inline-flex">
-        <Flame className="h-4 w-4 text-amber-500" />
+      <TooltipTrigger render={<span />} className="inline-flex">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
       </TooltipTrigger>
-      <TooltipContent>No activity for {days} days</TooltipContent>
+      <TooltipContent side="top" className="text-xxs">
+        No activity for {days}d
+      </TooltipContent>
     </Tooltip>
   );
 }

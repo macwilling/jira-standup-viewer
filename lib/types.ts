@@ -15,6 +15,13 @@ export interface Comment {
   createdAt: string;
 }
 
+export type LinkType = "blocks" | "blocked by" | "relates to" | "duplicates";
+
+export interface TicketLinkDef {
+  targetKey: string;
+  type: LinkType;
+}
+
 export interface Ticket {
   key: string;
   summary: string;
@@ -29,6 +36,7 @@ export interface Ticket {
   lastActivityDate: string;
   isL2: boolean;
   comments: Comment[];
+  links: TicketLinkDef[];
 }
 
 export interface Sprint {

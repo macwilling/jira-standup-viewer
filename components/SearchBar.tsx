@@ -15,7 +15,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -33,11 +32,11 @@ const priorityColors: Record<TicketPriority, string> = {
   Low: "text-blue-400",
 };
 
-const statusColors: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-500/20 text-slate-400",
-  "In Progress": "bg-blue-500/20 text-blue-400",
-  "In Review": "bg-yellow-500/20 text-yellow-400",
-  Done: "bg-green-500/20 text-green-400",
+const statusDotColors: Record<TicketStatus, string> = {
+  "To Do": "bg-slate-400",
+  "In Progress": "bg-blue-400",
+  "In Review": "bg-yellow-400",
+  Done: "bg-green-400",
 };
 
 interface SearchBarProps {
@@ -72,22 +71,18 @@ export function SearchBar({
   const l2Tickets = filtered.filter((t) => t.isL2);
   const allFiltered = [...sprintTickets, ...l2Tickets];
 
-  // Reset on open
   useEffect(() => {
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      // Focus input after dialog animation
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
-  // Reset selected index when results change
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Scroll selected item into view
   useEffect(() => {
     const item = listRef.current?.querySelector(`[data-index="${selectedIndex}"]`);
     item?.scrollIntoView({ block: "nearest" });
@@ -122,35 +117,33 @@ export function SearchBar({
         <DialogDescription>Search for tickets by key or keyword</DialogDescription>
       </DialogHeader>
       <DialogContent
-        className="top-[20%] translate-y-0 overflow-hidden rounded-xl! p-0 sm:max-w-xl"
+        className="top-[20%] translate-y-0 overflow-hidden rounded-lg! p-0 sm:max-w-lg"
         showCloseButton={false}
       >
         <div onKeyDown={handleKeyDown}>
-          {/* Search input */}
-          <div className="flex items-center gap-2 border-b px-3 py-2">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <div className="flex items-center gap-2 border-b px-3 py-1.5">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets by key or keyword..."
+              placeholder="Search tickets..."
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
 
-          {/* Results */}
-          <div ref={listRef} className="max-h-72 overflow-y-auto p-1">
+          <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
             {allFiltered.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
+              <p className="py-4 text-center text-xs text-muted-foreground">
                 No tickets found.
               </p>
             ) : (
               <>
                 {sprintTickets.length > 0 && (
                   <div className="p-1">
-                    <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                      Sprint Tickets
+                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide">
+                      Sprint
                     </p>
                     {sprintTickets.map((ticket) => {
                       const globalIndex = allFiltered.indexOf(ticket);
@@ -170,7 +163,7 @@ export function SearchBar({
 
                 {l2Tickets.length > 0 && (
                   <div className="p-1">
-                    <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide">
                       L2 / Support
                     </p>
                     {l2Tickets.map((ticket) => {
@@ -217,23 +210,26 @@ function SearchResultItem({
       onClick={() => onSelect(ticket)}
       onMouseEnter={onHover}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left text-sm transition-colors",
-        isSelected ? "bg-muted text-foreground" : "text-foreground/80 hover:bg-muted/50"
+        "flex w-full items-center gap-2 rounded-sm px-2 py-1 h-8 text-left text-sm transition-colors",
+        isSelected ? "bg-surface-hover text-foreground" : "text-foreground/80 hover:bg-surface-hover/50"
       )}
     >
-      <Icon
-        className={cn("h-4 w-4 shrink-0", priorityColors[ticket.priority])}
+      <span
+        className={cn(
+          "h-2 w-2 rounded-full shrink-0",
+          statusDotColors[ticket.status]
+        )}
       />
-      <span className="font-mono text-xs text-muted-foreground shrink-0">
+      <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px]">
         {ticket.key}
       </span>
       <span className="truncate flex-1">{ticket.summary}</span>
-      <Badge
-        variant="outline"
-        className={cn("shrink-0 text-xs", statusColors[ticket.status])}
-      >
-        {ticket.status}
-      </Badge>
+      <Icon
+        className={cn(
+          "h-3.5 w-3.5 shrink-0 opacity-40",
+          priorityColors[ticket.priority]
+        )}
+      />
     </button>
   );
 }

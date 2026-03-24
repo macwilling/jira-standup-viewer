@@ -44,6 +44,13 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        surface: {
+          hover: "hsl(var(--surface-hover))",
+          active: "hsl(var(--surface-active))",
+        },
+      },
+      fontSize: {
+        xxs: ["0.6875rem", { lineHeight: "1rem" }],
       },
       borderRadius: {
         lg: "var(--radius)",

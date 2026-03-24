@@ -23,29 +23,33 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --radius: 0.625rem;
+    --radius: 0.375rem;
+    --surface-hover: 0 0% 95%;
+    --surface-active: 0 0% 92%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 0 0% 6.5%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
+    --card: 0 0% 6.5%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
+    --popover: 0 0% 9%;
     --popover-foreground: 0 0% 98%;
     --primary: 0 0% 98%;
     --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --secondary: 0 0% 12%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 0 0% 12%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
+    --border: 0 0% 14%;
+    --input: 0 0% 14%;
     --ring: 0 0% 83.1%;
+    --surface-hover: 0 0% 10%;
+    --surface-active: 0 0% 12%;
   }
 
   * {
@@ -55,4 +59,64 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Linear-style thin scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+/* Collapsible expand/collapse — height reveal */
+[data-slot="collapsible-content"] {
+  height: var(--collapsible-panel-height);
+  transition: height 250ms cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+[data-slot="collapsible-content"][data-starting-style] {
+  height: 0;
+}
+[data-slot="collapsible-content"][data-ending-style] {
+  height: 0;
+}
+
+/* Sheet slide-in / slide-out keyframes */
+@keyframes sheet-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes sheet-slide-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+@keyframes sheet-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+[data-slot="sheet-content"][data-side="right"][data-open] {
+  animation: sheet-slide-in-right 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+[data-slot="sheet-content"][data-side="right"]:not([data-open]) {
+  animation: sheet-slide-out-right 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+[data-slot="sheet-overlay"][data-open] {
+  animation: sheet-overlay-in 280ms ease-out forwards;
+}
+[data-slot="sheet-overlay"]:not([data-open]) {
+  animation: sheet-overlay-out 200ms ease-in forwards;
 }

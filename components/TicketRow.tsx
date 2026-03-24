@@ -6,7 +6,6 @@ import {
   Equal,
   ChevronDown,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { StaleIndicator } from "./StaleIndicator";
 import { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
 import { isStale } from "@/lib/mock-data";
@@ -22,11 +21,11 @@ const priorityConfig: Record<
   Low: { icon: ChevronDown, className: "text-blue-400" },
 };
 
-const statusConfig: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  "In Progress": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  "In Review": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  Done: "bg-green-500/20 text-green-400 border-green-500/30",
+const statusDotColors: Record<TicketStatus, string> = {
+  "To Do": "bg-slate-400",
+  "In Progress": "bg-blue-400",
+  "In Review": "bg-yellow-400",
+  Done: "bg-green-400",
 };
 
 interface TicketRowProps {
@@ -35,7 +34,7 @@ interface TicketRowProps {
   variant?: "sprint" | "l2";
 }
 
-export function TicketRow({ ticket, onSelect, variant = "sprint" }: TicketRowProps) {
+export function TicketRow({ ticket, onSelect }: TicketRowProps) {
   const { icon: PriorityIcon, className: priorityClass } =
     priorityConfig[ticket.priority];
   const stale = isStale(ticket);
@@ -43,22 +42,24 @@ export function TicketRow({ ticket, onSelect, variant = "sprint" }: TicketRowPro
   return (
     <button
       onClick={() => onSelect(ticket)}
-      className={cn(
-        "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors hover:bg-accent/50",
-        variant === "l2" && "border-l-2 border-amber-500/60"
-      )}
+      className="w-full flex items-center gap-2 px-2 pr-4 py-1 h-8 rounded-sm text-left transition-colors hover:bg-surface-hover group"
     >
-      <PriorityIcon className={cn("h-4 w-4 shrink-0", priorityClass)} />
-      <span className="font-mono text-xs text-muted-foreground shrink-0">
+      <span
+        className={cn(
+          "h-2 w-2 rounded-full shrink-0",
+          statusDotColors[ticket.status]
+        )}
+      />
+      <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px]">
         {ticket.key}
       </span>
       <span className="text-sm truncate flex-1">{ticket.summary}</span>
-      <Badge
-        variant="outline"
-        className={cn("shrink-0 text-xs font-medium", statusConfig[ticket.status])}
-      >
-        {ticket.status}
-      </Badge>
+      <PriorityIcon
+        className={cn(
+          "h-3.5 w-3.5 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity",
+          priorityClass
+        )}
+      />
       {stale && <StaleIndicator lastActivityDate={ticket.lastActivityDate} />}
     </button>
   );
