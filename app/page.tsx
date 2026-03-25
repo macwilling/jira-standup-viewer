@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { TeamCard } from "@/components/TeamCard";
 import { TicketDrawer } from "@/components/TicketDrawer";
 import { SearchBar } from "@/components/SearchBar";
-import { teamMembers, tickets, sprint, isStale } from "@/lib/mock-data";
+import { SetupBanner } from "@/components/SetupBanner";
+import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketStatus, TeamMemberWithTickets } from "@/lib/types";
 
 export default function Home() {
+  const {
+    tickets,
+    teamMembers,
+    sprint,
+    isLoading,
+    error,
+    configured,
+    isStale,
+  } = useTicketData();
+
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketHistory, setTicketHistory] = useState<Ticket[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -26,7 +37,7 @@ export default function Home() {
       const staleCount = memberTickets.filter((t) => isStale(t)).length;
       return { ...member, sprintTickets, l2Tickets, staleCount };
     });
-  }, []);
+  }, [teamMembers, tickets, isStale]);
 
   const toggleMember = useCallback((id: string) => {
     setExpandedMembers((prev) => {
@@ -44,7 +55,6 @@ export default function Home() {
     setSelectedTicket((prev) => {
       if (prev && prev.key !== ticket.key) {
         setTicketHistory((h) => {
-          // Avoid duplicates from React strict mode double-invoke
           if (h.length > 0 && h[h.length - 1].key === prev.key) return h;
           return [...h, prev];
         });
@@ -119,28 +129,58 @@ export default function Home() {
           </button>
 
           <div className="text-right shrink-0">
-            <p className="text-xs font-medium">{sprint.name}</p>
-            <p className="text-xxs text-muted-foreground">
-              {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
-            </p>
+            {sprint ? (
+              <>
+                <p className="text-xs font-medium">{sprint.name}</p>
+                <p className="text-xxs text-muted-foreground">
+                  {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">No active sprint</p>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Single-column list layout */}
-      <main className="flex-1 px-4 py-3">
-        <div className="flex flex-col max-w-5xl mx-auto">
-          {membersWithTickets.map((member) => (
-            <TeamCard
-              key={member.id}
-              member={member}
-              isExpanded={expandedMembers.has(member.id)}
-              onToggle={() => toggleMember(member.id)}
-              onTicketSelect={handleTicketSelect}
-            />
-          ))}
+      {/* Setup banner */}
+      {!configured && <SetupBanner />}
+
+      {/* Loading state */}
+      {isLoading && tickets.length === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading tickets...</span>
+          </div>
         </div>
-      </main>
+      )}
+
+      {/* Error state */}
+      {error && configured && (
+        <div className="px-4 py-3">
+          <div className="max-w-5xl mx-auto rounded-md border border-destructive/50 bg-destructive/5 p-3">
+            <p className="text-sm text-destructive">Failed to load tickets: {error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      {tickets.length > 0 && (
+        <main className="flex-1 px-4 py-3">
+          <div className="flex flex-col max-w-5xl mx-auto">
+            {membersWithTickets.map((member) => (
+              <TeamCard
+                key={member.id}
+                member={member}
+                isExpanded={expandedMembers.has(member.id)}
+                onToggle={() => toggleMember(member.id)}
+                onTicketSelect={handleTicketSelect}
+              />
+            ))}
+          </div>
+        </main>
+      )}
 
       {searchOpen && (
         <SearchBar

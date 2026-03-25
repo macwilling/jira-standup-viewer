@@ -1,0 +1,225 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { ArrowLeft, CheckCircle2, XCircle, Loader2, Save } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+interface ConfigStatus {
+  jiraConnected: boolean;
+  jiraStatus: { ok: boolean; user?: string; error?: string };
+  kvConnected: boolean;
+  config: { jqlFilter: string; l2LabelPatterns: string[] } | null;
+}
+
+export default function SettingsPage() {
+  const [status, setStatus] = useState<ConfigStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ count: number } | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const [jqlFilter, setJqlFilter] = useState("");
+  const [l2Labels, setL2Labels] = useState("");
+
+  // Load current config
+  useEffect(() => {
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data: ConfigStatus) => {
+        setStatus(data);
+        if (data.config) {
+          setJqlFilter(data.config.jqlFilter);
+          setL2Labels(data.config.l2LabelPatterns.join(", "));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jqlFilter,
+          l2LabelPatterns: l2Labels
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        }),
+      });
+      if (res.ok) setSaved(true);
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/jira/tickets");
+      if (res.ok) {
+        const data = await res.json();
+        setTestResult({ count: data.tickets?.length || 0 });
+      }
+    } catch {
+      // ignore
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="flex items-center h-11 px-4 gap-3">
+          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <h1 className="text-sm font-semibold">Settings</h1>
+        </div>
+      </header>
+
+      <main className="max-w-xl mx-auto px-4 py-8 space-y-8">
+        {/* Jira Connection Status */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Jira Connection
+          </h2>
+          <div className="rounded-lg border p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              {status?.jiraStatus.ok ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span>Connected as <span className="font-medium">{status.jiraStatus.user}</span></span>
+                </>
+              ) : status?.jiraConnected ? (
+                <>
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  <span>Authentication failed: {status.jiraStatus.error}</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">
+                    Not configured — set <code className="text-xs bg-muted px-1 py-0.5 rounded">JIRA_URL</code>,{" "}
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">JIRA_EMAIL</code>,{" "}
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded">JIRA_API_TOKEN</code> in environment variables
+                  </span>
+                </>
+              )}
+            </div>
+            {!status?.kvConnected && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <XCircle className="h-4 w-4" />
+                <span>
+                  KV not configured — set <code className="text-xs bg-muted px-1 py-0.5 rounded">CLOUDFLARE_API_TOKEN</code>,{" "}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">CLOUDFLARE_ACCOUNT_ID</code>,{" "}
+                  <code className="text-xs bg-muted px-1 py-0.5 rounded">CLOUDFLARE_KV_NAMESPACE_ID</code>
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* JQL Filter */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Board Configuration
+          </h2>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="jql" className="text-xs">JQL Filter</Label>
+              <Textarea
+                id="jql"
+                value={jqlFilter}
+                onChange={(e) => setJqlFilter(e.target.value)}
+                placeholder='project = PROJ AND sprint in openSprints() ORDER BY priority DESC'
+                className="min-h-[80px] font-mono text-xs"
+              />
+              <p className="text-xxs text-muted-foreground">
+                JQL query that returns all tickets for your standup board (sprint + L2).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="l2" className="text-xs">L2 Label Patterns</Label>
+              <Input
+                id="l2"
+                value={l2Labels}
+                onChange={(e) => setL2Labels(e.target.value)}
+                placeholder="l2-support, l2, support-escalation"
+                className="text-xs"
+              />
+              <p className="text-xxs text-muted-foreground">
+                Comma-separated labels. Tickets with any of these labels are shown as L2/Support.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !jqlFilter.trim()}
+            className="h-8 text-xs"
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+            ) : (
+              <Save className="h-3.5 w-3.5 mr-1.5" />
+            )}
+            Save Configuration
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTest}
+            disabled={testing || !status?.jiraStatus.ok}
+            className="h-8 text-xs"
+          >
+            {testing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+            ) : null}
+            Test Query
+          </Button>
+
+          {saved && (
+            <span className="text-xs text-green-600 flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Saved
+            </span>
+          )}
+
+          {testResult && (
+            <span className="text-xs text-muted-foreground">
+              Found {testResult.count} ticket{testResult.count !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   ChevronsUp,
   ChevronUp,
   Equal,
   ChevronDown,
   Search,
+  Loader2,
+  Globe,
 } from "lucide-react";
 import {
   Dialog,
@@ -54,8 +56,11 @@ export function SearchBar({
 }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [remoteResults, setRemoteResults] = useState<Ticket[]>([]);
+  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return tickets;
@@ -67,9 +72,44 @@ export function SearchBar({
     );
   }, [query, tickets]);
 
-  const sprintTickets = filtered.filter((t) => !t.isL2);
-  const l2Tickets = filtered.filter((t) => t.isL2);
-  const allFiltered = [...sprintTickets, ...l2Tickets];
+  // Debounced global Jira search
+  const searchJira = useCallback((q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (q.length < 3) {
+      setRemoteResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/jira/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRemoteResults(data.tickets || []);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  useEffect(() => {
+    searchJira(query);
+  }, [query, searchJira]);
+
+  // Merge local + remote, deduplicate by key
+  const mergedResults = useMemo(() => {
+    const localKeys = new Set(filtered.map((t) => t.key));
+    const uniqueRemote = remoteResults.filter((t) => !localKeys.has(t.key));
+    return { local: filtered, remote: uniqueRemote };
+  }, [filtered, remoteResults]);
+
+  const sprintTickets = mergedResults.local.filter((t) => !t.isL2);
+  const l2Tickets = mergedResults.local.filter((t) => t.isL2);
+  const allFiltered = [...sprintTickets, ...l2Tickets, ...mergedResults.remote];
 
   useEffect(() => {
     if (open) {
@@ -179,6 +219,35 @@ export function SearchBar({
                         />
                       );
                     })}
+                  </div>
+                )}
+
+                {mergedResults.remote.length > 0 && (
+                  <div className="p-1">
+                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                      <Globe className="h-3 w-3" />
+                      Jira Search
+                    </p>
+                    {mergedResults.remote.map((ticket) => {
+                      const globalIndex = allFiltered.indexOf(ticket);
+                      return (
+                        <SearchResultItem
+                          key={ticket.key}
+                          ticket={ticket}
+                          isSelected={globalIndex === selectedIndex}
+                          dataIndex={globalIndex}
+                          onSelect={handleSelect}
+                          onHover={() => setSelectedIndex(globalIndex)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+
+                {searching && (
+                  <div className="flex items-center justify-center gap-1.5 py-2 text-xxs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Searching Jira...
                   </div>
                 )}
               </>

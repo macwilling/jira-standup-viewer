@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   ChevronsUp,
   ChevronUp,
@@ -33,7 +33,7 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Ticket, TicketPriority, TicketStatus, TeamMember } from "@/lib/types";
-import { isStale } from "@/lib/mock-data";
+import { useTicketData } from "@/lib/ticket-data-context";
 import { cn } from "@/lib/utils";
 import { TicketLink } from "./TicketLink";
 import { TicketTooltip } from "./TicketTooltip";
@@ -115,36 +115,111 @@ export function TicketDrawer({
   onBack,
   onBreadcrumbNav,
 }: TicketDrawerProps) {
+  const { isStale } = useTicketData();
   const [comment, setComment] = useState("");
   const [epicExpanded, setEpicExpanded] = useState(false);
   const scrollRef = useRef(null as HTMLDivElement | null);
 
-  // Scroll to top when switching tickets
-  useEffect(() => {
-    if (ticket && scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
-    setEpicExpanded(false);
-  }, [ticket]);
+  // Epic children state
+  const [epicChildren, setEpicChildren] = useState<Ticket[]>([]);
+  const [epicLoading, setEpicLoading] = useState(false);
 
-  // Get tickets in same epic
-  const epicSiblings = useMemo(() => {
+  // Linked tickets state
+  const [fetchedLinks, setFetchedLinks] = useState<
+    { type: string; targetKey: string; ticket: Ticket }[]
+  >([]);
+  const [linksLoading, setLinksLoading] = useState(false);
+
+  // Track what we've fetched to avoid re-fetching
+  const lastFetchedTicketKey = useRef<string | null>(null);
+
+  // Fetch epic children + linked tickets when ticket changes
+  useEffect(() => {
+    if (!ticket || ticket.key === lastFetchedTicketKey.current) return;
+    lastFetchedTicketKey.current = ticket.key;
+
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    setEpicExpanded(false);
+    setEpicChildren([]);
+    setFetchedLinks([]);
+
+    // Fetch epic children
+    if (ticket.epicKey) {
+      setEpicLoading(true);
+      fetch(`/api/jira/epic-children?epicKey=${encodeURIComponent(ticket.epicKey)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.tickets) {
+            setEpicChildren(data.tickets.filter((t: Ticket) => t.key !== ticket.key));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setEpicLoading(false));
+    }
+
+    // Fetch linked tickets from Jira
+    const linkKeys = ticket.links.map((l) => l.targetKey);
+    if (linkKeys.length > 0) {
+      // First check which ones we already have locally
+      const localMap = new Map(allTickets.map((t) => [t.key, t]));
+      const missingKeys = linkKeys.filter((k) => !localMap.has(k));
+
+      if (missingKeys.length > 0) {
+        setLinksLoading(true);
+        fetch(`/api/jira/issues?keys=${encodeURIComponent(missingKeys.join(","))}`)
+          .then((r) => r.json())
+          .then((data) => {
+            const fetchedMap = new Map(
+              (data.tickets || []).map((t: Ticket) => [t.key, t])
+            );
+            // Merge local + fetched
+            const resolved = ticket.links
+              .map((link) => ({
+                type: link.type,
+                targetKey: link.targetKey,
+                ticket: localMap.get(link.targetKey) || fetchedMap.get(link.targetKey),
+              }))
+              .filter((l) => !!l.ticket) as { type: string; targetKey: string; ticket: Ticket }[];
+            setFetchedLinks(resolved);
+          })
+          .catch(() => {
+            // Fall back to local only
+            const resolved = ticket.links
+              .map((link) => ({
+                type: link.type,
+                targetKey: link.targetKey,
+                ticket: localMap.get(link.targetKey),
+              }))
+              .filter((l) => !!l.ticket) as { type: string; targetKey: string; ticket: Ticket }[];
+            setFetchedLinks(resolved);
+          })
+          .finally(() => setLinksLoading(false));
+      } else {
+        // All links are local
+        const resolved = ticket.links
+          .map((link) => ({
+            type: link.type,
+            targetKey: link.targetKey,
+            ticket: localMap.get(link.targetKey),
+          }))
+          .filter((l) => !!l.ticket) as { type: string; targetKey: string; ticket: Ticket }[];
+        setFetchedLinks(resolved);
+      }
+    }
+  }, [ticket, allTickets]);
+
+  // Epic siblings: use fetched if available, else local filter
+  const localEpicSiblings = useMemo(() => {
     if (!ticket?.epicName) return [];
     return allTickets.filter(
       (t) => t.epicName === ticket.epicName && t.key !== ticket.key
     );
   }, [ticket, allTickets]);
 
-  // Resolve linked tickets
-  const resolvedLinks = useMemo(() => {
-    if (!ticket) return [];
-    return ticket.links
-      .map((link) => ({
-        ...link,
-        ticket: allTickets.find((t) => t.key === link.targetKey),
-      }))
-      .filter((l) => l.ticket);
-  }, [ticket, allTickets]);
+  const epicSiblings = epicChildren.length > 0 ? epicChildren : localEpicSiblings;
+
+  // Resolved links: use fetched if available
+  const resolvedLinks = fetchedLinks;
 
   if (!ticket) return null;
 
@@ -153,6 +228,46 @@ export function TicketDrawer({
   const stale = isStale(ticket);
   const assignee = teamMembers.find((m) => m.id === ticket.assigneeId);
   const getMember = (id: string) => teamMembers.find((m) => m.id === id);
+
+  function extractTextContent(node: React.ReactNode): string {
+    if (!node) return "";
+    if (typeof node === "string") return node;
+    if (typeof node === "number") return String(node);
+    if (Array.isArray(node)) return node.map(extractTextContent).join("");
+    if (React.isValidElement(node) && node.props) {
+      return extractTextContent((node.props as { children?: React.ReactNode }).children);
+    }
+    return "";
+  }
+
+  function filterPanelMarker(children: React.ReactNode): React.ReactNode {
+    if (!children) return children;
+    if (typeof children === "string") {
+      return children.replace(/\[panel-(success|warning|error|info|note)\]\s*/g, "");
+    }
+    if (Array.isArray(children)) {
+      return children.map((child, i) => {
+        if (typeof child === "string") {
+          const filtered = child.replace(/\[panel-(success|warning|error|info|note)\]\s*/g, "");
+          return filtered || null;
+        }
+        if (React.isValidElement(child) && child.props) {
+          const props = child.props as { children?: React.ReactNode };
+          const filteredChildren = filterPanelMarker(props.children);
+          // Skip paragraphs that only contained the marker
+          const text = extractTextContent(filteredChildren);
+          if (!text.trim()) return null;
+          return React.cloneElement(child, { key: i }, filteredChildren);
+        }
+        return child;
+      }).filter(Boolean);
+    }
+    if (React.isValidElement(children) && children.props) {
+      const props = children.props as { children?: React.ReactNode };
+      return React.cloneElement(children, {}, filterPanelMarker(props.children));
+    }
+    return children;
+  }
 
   function processChildren(children: React.ReactNode): React.ReactNode {
     if (!children) return children;
@@ -170,18 +285,101 @@ export function TicketDrawer({
     return children;
   }
 
+  // Panel type styles for Jira callout blocks
+  const panelStyles: Record<string, { bg: string; border: string; icon: string }> = {
+    success: { bg: "bg-emerald-500/10", border: "border-emerald-500/30", icon: "✅" },
+    warning: { bg: "bg-amber-500/10", border: "border-amber-500/30", icon: "⚠️" },
+    error: { bg: "bg-red-500/10", border: "border-red-500/30", icon: "❌" },
+    info: { bg: "bg-blue-500/10", border: "border-blue-500/30", icon: "ℹ️" },
+    note: { bg: "bg-purple-500/10", border: "border-purple-500/30", icon: "📝" },
+  };
+
   // Custom markdown components that render ticket references inline
   const markdownComponents: Components = {
+    blockquote: ({ children }) => {
+      // Check if this is a Jira panel by looking for [panel-*] marker in text content
+      const textContent = extractTextContent(children);
+      const panelMatch = textContent.match(/\[panel-(success|warning|error|info|note)\]/);
+      if (panelMatch) {
+        const type = panelMatch[1];
+        const style = panelStyles[type] || panelStyles.info;
+        // Remove the marker from rendered children
+        return (
+          <div className={`${style.bg} ${style.border} border rounded-md p-3 my-2`}>
+            <div className="flex gap-2">
+              <span className="shrink-0">{style.icon}</span>
+              <div className="flex-1 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
+                {filterPanelMarker(children)}
+              </div>
+            </div>
+          </div>
+        );
+      }
+      // Regular blockquote
+      return (
+        <blockquote className="border-l-2 border-border/60 pl-3 my-2 text-muted-foreground italic">
+          {children}
+        </blockquote>
+      );
+    },
     p: ({ children }) => (
       <p>
         {processChildren(children)}
       </p>
     ),
+    ul: ({ children }) => (
+      <ul className="pl-6 space-y-1.5 my-1.5 [list-style-type:disc] [&_ul]:[list-style-type:circle] [&_ul_ul]:[list-style-type:square]">
+        {children}
+      </ul>
+    ),
+    ol: ({ children }) => (
+      <ol className="pl-6 space-y-1.5 my-1.5 list-decimal [&_ol]:[list-style-type:lower-alpha] [&_ol_ol]:[list-style-type:lower-roman]">
+        {children}
+      </ol>
+    ),
     li: ({ children }) => (
-      <li>
+      <li className="pl-1 [&>ul]:mt-1 [&>ol]:mt-1">
         {processChildren(children)}
       </li>
     ),
+    img: ({ src, alt }) => (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt || "attachment"}
+        className="max-w-full rounded-md border my-2"
+        loading="lazy"
+      />
+    ),
+    code: ({ children, className }) => {
+      // If it has a className like "language-*", it's inside a code block (pre > code)
+      if (className) {
+        return <code className={className}>{children}</code>;
+      }
+      // Inline code — subtle grey bubble like Jira
+      return (
+        <code className="px-1.5 py-0.5 rounded bg-muted/60 text-[0.85em] font-mono text-foreground/80">
+          {children}
+        </code>
+      );
+    },
+    pre: ({ children }) => (
+      <pre className="my-2 rounded-lg bg-muted/40 border border-border/50 p-3 overflow-x-auto text-[0.85em] leading-relaxed">
+        {children}
+      </pre>
+    ),
+    a: ({ href, children }) => {
+      // Check if href is a Jira browse URL
+      const jiraKeyMatch = href?.match(/\/browse\/([A-Z][A-Z0-9]+-\d+)/);
+      if (jiraKeyMatch) {
+        return <TicketLink text={href!} onTicketClick={onTicketSelect} />;
+      }
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+          {children}
+        </a>
+      );
+    },
   };
 
   const handleSubmitComment = () => {
@@ -192,7 +390,8 @@ export function TicketDrawer({
     <Sheet open={!!ticket} onOpenChange={(open) => !open && onClose()}>
       <SheetContent
         side="right"
-        className="w-[420px] sm:max-w-[420px] p-0 flex flex-col"
+        className="p-0 flex flex-col"
+        defaultWidth={420}
       >
         {/* Header */}
         <SheetHeader className="px-5 pt-4 pb-3 space-y-2 border-b shrink-0">
@@ -315,16 +514,17 @@ export function TicketDrawer({
                         ({epicSiblings.length + 1})
                       </span>
                     )}
-                    {epicSiblings.length > 0 && (
-                      <ChevronRight className={cn(
-                        "h-3 w-3 text-muted-foreground transition-transform duration-150",
-                        epicExpanded && "rotate-90"
-                      )} />
-                    )}
+                    <ChevronRight className={cn(
+                      "h-3 w-3 text-muted-foreground transition-transform duration-150",
+                      epicExpanded && "rotate-90"
+                    )} />
                   </button>
 
                   {/* Epic children list */}
-                  {epicExpanded && epicSiblings.length > 0 && (
+                  {epicExpanded && epicLoading && (
+                    <div className="mt-1.5 pl-4 text-xxs text-muted-foreground">Loading...</div>
+                  )}
+                  {epicExpanded && !epicLoading && epicSiblings.length > 0 && (
                     <div className="mt-1.5 space-y-0.5 pl-4 border-l-2 border-border/50">
                       {epicSiblings.map((t) => (
                         <TicketTooltip key={t.key} ticket={t} side="bottom">
@@ -375,7 +575,7 @@ export function TicketDrawer({
           </div>
 
           {/* Linked Tickets */}
-          {resolvedLinks.length > 0 && (
+          {(resolvedLinks.length > 0 || linksLoading) && (
             <div className="px-5 py-3 border-b space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Link2 className="h-3.5 w-3.5" />
@@ -439,9 +639,11 @@ export function TicketDrawer({
                         {formatRelativeTime(c.createdAt)}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">
-                      <TicketLink text={c.body} onTicketClick={onTicketSelect} />
-                    </p>
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground leading-relaxed mt-0.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:my-1 [&_strong]:font-semibold [&_img]:max-w-full [&_img]:rounded-md [&_img]:border [&_img]:my-1">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {c.body}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               );

@@ -41,11 +41,52 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  defaultWidth = 420,
+  minWidth = 320,
+  maxWidth = 900,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  defaultWidth?: number
+  minWidth?: number
+  maxWidth?: number
 }) {
+  const [width, setWidth] = React.useState(defaultWidth)
+  const isDragging = React.useRef(false)
+  const startX = React.useRef(0)
+  const startWidth = React.useRef(0)
+
+  const handleMouseDown = React.useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      isDragging.current = true
+      startX.current = e.clientX
+      startWidth.current = width
+      document.body.style.cursor = "col-resize"
+      document.body.style.userSelect = "none"
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging.current) return
+        const delta = startX.current - e.clientX
+        const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidth.current + delta))
+        setWidth(newWidth)
+      }
+
+      const handleMouseUp = () => {
+        isDragging.current = false
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        document.removeEventListener("mousemove", handleMouseMove)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
+
+      document.addEventListener("mousemove", handleMouseMove)
+      document.addEventListener("mouseup", handleMouseUp)
+    },
+    [width, minWidth, maxWidth]
+  )
+
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -53,11 +94,21 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm",
+          "fixed z-50 flex flex-col bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:border-l data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:border-r data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b",
           className
         )}
+        style={{ width: side === "right" || side === "left" ? width : undefined }}
         {...props}
       >
+        {/* Drag handle */}
+        {(side === "right") && (
+          <div
+            onMouseDown={handleMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/10 active:bg-primary/20 transition-colors z-10 group"
+          >
+            <div className="absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/40 transition-colors" />
+          </div>
+        )}
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close

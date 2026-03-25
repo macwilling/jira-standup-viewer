@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { StaleIndicator } from "./StaleIndicator";
 import { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
-import { isStale } from "@/lib/mock-data";
+import { useTicketData } from "@/lib/ticket-data-context";
 import { cn } from "@/lib/utils";
 
 const priorityConfig: Record<
@@ -35,6 +35,7 @@ interface TicketRowProps {
 }
 
 export function TicketRow({ ticket, onSelect }: TicketRowProps) {
+  const { isStale } = useTicketData();
   const { icon: PriorityIcon, className: priorityClass } =
     priorityConfig[ticket.priority];
   const stale = isStale(ticket);

@@ -29,6 +29,7 @@ export interface Ticket {
   priority: TicketPriority;
   type: TicketType;
   assigneeId: string;
+  epicKey: string | null;
   epicName: string | null;
   epicColor: string | null;
   labels: string[];

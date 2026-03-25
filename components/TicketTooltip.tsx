@@ -8,7 +8,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
-import { tickets, teamMembers, isStale } from "@/lib/mock-data";
+import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketPriority } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +43,7 @@ const priorityColors: Record<TicketPriority, string> = {
 function shortenDescription(desc: string, maxLen = 120): string {
   const plain = desc.replace(/[#*_`~\[\]]/g, "").replace(/\n+/g, " ").trim();
   if (plain.length <= maxLen) return plain;
-  return plain.slice(0, maxLen).replace(/\s\S*$/, "") + "…";
+  return plain.slice(0, maxLen).replace(/\s\S*$/, "") + "\u2026";
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -54,10 +54,6 @@ function formatRelativeTime(dateStr: string): string {
   return `${days}d ago`;
 }
 
-export function findTicket(key: string): Ticket | undefined {
-  return tickets.find((t) => t.key === key);
-}
-
 interface TicketTooltipProps {
   ticket: Ticket;
   children: React.ReactElement;
@@ -65,22 +61,20 @@ interface TicketTooltipProps {
   align?: "start" | "center" | "end";
 }
 
-/**
- * Wraps children with a hover tooltip showing ticket preview.
- * The child element must accept being rendered as a TooltipTrigger.
- */
 export function TicketTooltip({
   ticket,
   children,
   side = "bottom",
   align = "start",
 }: TicketTooltipProps) {
+  const { teamMembers, isStale } = useTicketData();
   const PriorityIcon = priorityIcons[ticket.priority];
   const assignee = teamMembers.find((m) => m.id === ticket.assigneeId);
   const stale = isStale(ticket);
 
   return (
-    <TooltipPrimitive.Root delay={50} closeDelay={100}>
+    <TooltipPrimitive.Provider delay={50} closeDelay={100}>
+    <TooltipPrimitive.Root>
       <TooltipPrimitive.Trigger render={children} />
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Positioner
@@ -96,7 +90,6 @@ export function TicketTooltip({
               "animate-in fade-in-0 zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
             )}
           >
-            {/* Header */}
             <div>
               <div className="flex items-center gap-1.5 text-xxs text-muted-foreground">
                 <span className="font-mono">{ticket.key}</span>
@@ -109,7 +102,6 @@ export function TicketTooltip({
               </p>
             </div>
 
-            {/* Meta row */}
             <div className="flex items-center gap-2 flex-wrap text-xxs">
               <span className="inline-flex items-center gap-1">
                 <span className={cn("h-1.5 w-1.5 rounded-full", statusDotColors[ticket.status])} />
@@ -131,7 +123,6 @@ export function TicketTooltip({
               )}
             </div>
 
-            {/* Epic */}
             {ticket.epicName && (
               <div className="flex items-center gap-1.5 text-xxs text-muted-foreground">
                 <span
@@ -142,12 +133,10 @@ export function TicketTooltip({
               </div>
             )}
 
-            {/* Description snippet */}
             <p className="text-xxs text-muted-foreground leading-relaxed">
               {shortenDescription(ticket.description)}
             </p>
 
-            {/* Activity */}
             <div className={cn(
               "flex items-center gap-1 text-xxs",
               stale ? "text-amber-600" : "text-muted-foreground/70"
@@ -162,5 +151,6 @@ export function TicketTooltip({
         </TooltipPrimitive.Positioner>
       </TooltipPrimitive.Portal>
     </TooltipPrimitive.Root>
+    </TooltipPrimitive.Provider>
   );
 }
