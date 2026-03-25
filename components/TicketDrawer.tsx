@@ -88,6 +88,7 @@ export function TicketDrawer({
   teamMembers,
   allTickets,
   onClose,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onStatusChange,
   onTicketSelect,
   ticketHistory,
@@ -207,46 +208,6 @@ export function TicketDrawer({
   const stale = isStale(ticket);
   const assignee = teamMembers.find((m) => m.id === ticket.assigneeId);
   const getMember = (id: string) => teamMembers.find((m) => m.id === id);
-
-  function extractTextContent(node: React.ReactNode): string {
-    if (!node) return "";
-    if (typeof node === "string") return node;
-    if (typeof node === "number") return String(node);
-    if (Array.isArray(node)) return node.map(extractTextContent).join("");
-    if (React.isValidElement(node) && node.props) {
-      return extractTextContent((node.props as { children?: React.ReactNode }).children);
-    }
-    return "";
-  }
-
-  function filterPanelMarker(children: React.ReactNode): React.ReactNode {
-    if (!children) return children;
-    if (typeof children === "string") {
-      return children.replace(/\[panel-(success|warning|error|info|note)\]\s*/g, "");
-    }
-    if (Array.isArray(children)) {
-      return children.map((child, i) => {
-        if (typeof child === "string") {
-          const filtered = child.replace(/\[panel-(success|warning|error|info|note)\]\s*/g, "");
-          return filtered || null;
-        }
-        if (React.isValidElement(child) && child.props) {
-          const props = child.props as { children?: React.ReactNode };
-          const filteredChildren = filterPanelMarker(props.children);
-          // Skip paragraphs that only contained the marker
-          const text = extractTextContent(filteredChildren);
-          if (!text.trim()) return null;
-          return React.cloneElement(child, { key: i }, filteredChildren);
-        }
-        return child;
-      }).filter(Boolean);
-    }
-    if (React.isValidElement(children) && children.props) {
-      const props = children.props as { children?: React.ReactNode };
-      return React.cloneElement(children, {}, filterPanelMarker(props.children));
-    }
-    return children;
-  }
 
   function processChildren(children: React.ReactNode): React.ReactNode {
     if (!children) return children;

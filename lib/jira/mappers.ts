@@ -1,6 +1,5 @@
 import {
   Ticket,
-  TicketStatus,
   TicketPriority,
   TicketType,
   TeamMember,

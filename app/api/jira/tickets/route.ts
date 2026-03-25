@@ -38,7 +38,7 @@ export async function GET() {
     const tickets = issues.map((issue) => mapJiraIssue(issue, l2Patterns));
 
     // Fetch real epic colors from Jira Agile API
-    const epicKeys = [...new Set(tickets.filter((t) => t.epicKey).map((t) => t.epicKey!))];
+    const epicKeys = Array.from(new Set(tickets.filter((t) => t.epicKey).map((t) => t.epicKey!)));
     if (epicKeys.length > 0) {
       const epicColorMap = await fetchEpicColors(epicKeys);
       // Jira Agile API returns color keys like "color_1", map to hex
