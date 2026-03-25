@@ -29,6 +29,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Ticket, TicketPriority, TicketStatus, TeamMember } from "@/lib/types";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
@@ -274,25 +275,25 @@ export function TicketDrawer({
 
   // Custom markdown components that render ticket references inline
   const markdownComponents: Components = {
-    blockquote: ({ children }) => {
-      // Check if this is a Jira panel by looking for [panel-*] marker in text content
-      const textContent = extractTextContent(children);
-      const panelMatch = textContent.match(/\[panel-(success|warning|error|info|note)\]/);
-      if (panelMatch) {
-        const type = panelMatch[1];
-        const style = panelStyles[type] || panelStyles.info;
-        // Remove the marker from rendered children
+    div: ({ node, children, ...props }) => {
+      // Check if this is a Jira panel via data-panel attribute
+      const panelType = (node?.properties?.dataPanel as string) || null;
+      if (panelType) {
+        const style = panelStyles[panelType] || panelStyles.info;
         return (
-          <div className={`${style.bg} ${style.border} border rounded-md p-3 my-2`}>
-            <div className="flex gap-2">
-              <span className="shrink-0">{style.icon}</span>
-              <div className="flex-1 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0">
-                {filterPanelMarker(children)}
+          <div className={`${style.bg} ${style.border} border rounded-md p-3 my-2 overflow-hidden`}>
+            <div className="flex items-start gap-2 min-w-0">
+              <span className="shrink-0 mt-0.5 text-sm leading-none">{style.icon}</span>
+              <div className="flex-1 min-w-0 overflow-hidden break-words [&>p:first-child]:mt-0 [&>p:last-child]:mb-0 [&>h2:first-child]:mt-0">
+                {children}
               </div>
             </div>
           </div>
         );
       }
+      return <div {...props}>{children}</div>;
+    },
+    blockquote: ({ children }) => {
       // Regular blockquote
       return (
         <blockquote className="border-l-2 border-border/60 pl-3 my-2 text-muted-foreground italic">
@@ -336,7 +337,7 @@ export function TicketDrawer({
       }
       // Inline code — subtle grey bubble like Jira
       return (
-        <code className="px-1.5 py-0.5 rounded bg-muted/60 text-[0.85em] font-mono text-foreground/80">
+        <code className="px-1.5 py-0.5 rounded bg-muted/60 text-[0.85em] font-mono text-foreground/80 break-all">
           {children}
         </code>
       );
@@ -630,7 +631,7 @@ export function TicketDrawer({
           {/* Description */}
           <div className="px-5 py-3 border-b">
             <div className="prose prose-sm dark:prose-invert max-w-none text-sm [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-xs [&_h3]:font-semibold [&_p]:text-xs [&_p]:leading-relaxed [&_li]:text-xs [&_li]:leading-relaxed [&_ul]:my-1 [&_ol]:my-1 [&_p]:my-1.5 [&_h1]:my-2 [&_h2]:my-2 [&_strong]:font-semibold">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
                 {ticket.description}
               </ReactMarkdown>
             </div>
@@ -663,7 +664,7 @@ export function TicketDrawer({
                       </span>
                     </div>
                     <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground leading-relaxed mt-0.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:my-1 [&_strong]:font-semibold [&_img]:max-w-full [&_img]:rounded-md [&_img]:border [&_img]:my-1">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
                         {c.body}
                       </ReactMarkdown>
                     </div>

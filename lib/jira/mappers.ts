@@ -81,8 +81,8 @@ export function adfToMarkdown(node: JiraAdfNode | null, attachments?: Attachment
     let text = node.text || "";
     if (node.marks) {
       for (const mark of node.marks) {
-        if (mark.type === "strong") text = `**${text}**`;
-        if (mark.type === "em") text = `*${text}*`;
+        if (mark.type === "strong") text = `<strong>${text}</strong>`;
+        if (mark.type === "em") text = `<em>${text}</em>`;
         if (mark.type === "code") text = `\`${text}\``;
         if (mark.type === "strike") text = `~~${text}~~`;
         if (mark.type === "link" && mark.attrs?.href) {
@@ -159,7 +159,8 @@ export function adfToMarkdown(node: JiraAdfNode | null, attachments?: Attachment
     case "rule":
       return "---\n\n";
     case "hardBreak":
-      return "\n";
+      // Two trailing spaces + newline = markdown line break
+      return "  \n";
     case "mention":
       return `**@${node.attrs?.text || "user"}**`;
     case "inlineCard":
@@ -197,10 +198,8 @@ export function adfToMarkdown(node: JiraAdfNode | null, attachments?: Attachment
     case "panel": {
       const panelChildren = (node.content || []).map((c) => adfToMarkdown(c, attachments, context)).join("");
       const panelType = (node.attrs?.panelType as string) || "info";
-      // Prefix each line with `> ` for proper blockquote, embed panel type as first line marker
-      const lines = panelChildren.trim().split("\n");
-      const quoted = lines.map((line) => `> ${line}`).join("\n");
-      return `> [panel-${panelType}]\n${quoted}\n\n`;
+      // Use HTML div with data attribute so rehype-raw preserves it and our custom renderer picks it up
+      return `<div data-panel="${panelType}">\n\n${panelChildren.trim()}\n\n</div>\n\n`;
     }
     case "status":
       return `\`${node.attrs?.text || "status"}\``;
