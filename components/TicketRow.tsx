@@ -53,11 +53,12 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
         ))}
         {rest}
       </span>
+      {/* Secondary info — dimmed by default, revealed on hover */}
       {ticket.epicName && (() => {
         const color = getEpicColor(ticket.epicName, ticket.epicColor);
         return (
           <span
-            className="shrink-0 max-w-[100px] truncate rounded px-1.5 py-px text-[10px] font-medium leading-tight opacity-70 group-hover:opacity-100 transition-opacity"
+            className="shrink-0 max-w-[100px] truncate rounded px-1.5 py-px text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-70 transition-opacity duration-150"
             style={{
               backgroundColor: color + "20",
               color: color,
@@ -70,15 +71,20 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
       })()}
       <PriorityIcon
         className={cn(
-          "h-3.5 w-3.5 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity",
+          "h-3.5 w-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity duration-150",
           priorityClass
         )}
       />
-      {stale && <StaleIndicator lastActivityDate={ticket.lastActivityDate} />}
+      {stale && (
+        <span className="opacity-40 group-hover:opacity-100 transition-opacity duration-150">
+          <StaleIndicator lastActivityDate={ticket.lastActivityDate} />
+        </span>
+      )}
+      {/* Status badge — always visible but subtle, stronger on hover */}
       <span
         className={cn(
           statusBadgeBase,
-          "text-[9px] px-1 py-0.5 shrink-0",
+          "text-[9px] px-1 py-0.5 shrink-0 opacity-60 group-hover:opacity-100 transition-opacity duration-150",
           getStatusBadgeColor(ticket.statusCategory)
         )}
       >

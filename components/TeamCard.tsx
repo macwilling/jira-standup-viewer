@@ -56,27 +56,13 @@ export function TeamCard({
             {member.name}
           </span>
 
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 text-xxs text-muted-foreground">
-              <span className="font-semibold">{member.sprintTickets.length}</span>
-              <span>sprint</span>
-            </span>
-
+          <div className="flex items-center gap-2 text-xxs text-muted-foreground/60 tabular-nums">
+            <span>{totalTickets}</span>
             {member.l2Tickets.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-xxs text-violet-400">
-                <span className="font-semibold">{member.l2Tickets.length}</span>
-                <span>L2/support</span>
-              </span>
+              <span className="text-violet-400/60">{member.l2Tickets.length} L2</span>
             )}
-
             {member.staleCount > 0 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xxs text-amber-500"
-                title={`${member.staleCount} ticket${member.staleCount === 1 ? "" : "s"} with no activity in 3+ days`}
-              >
-                <span className="font-semibold">{member.staleCount}</span>
-                <span>stale</span>
-              </span>
+              <span className="text-amber-500/60">{member.staleCount} stale</span>
             )}
           </div>
         </div>
