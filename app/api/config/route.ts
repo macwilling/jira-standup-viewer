@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
     await saveConfig({
       jqlFilter: body.jqlFilter,
       l2LabelPatterns: body.l2LabelPatterns || [],
+      ...(body.sprintFieldId ? { sprintFieldId: body.sprintFieldId } : {}),
+      ...(body.boardId ? { boardId: body.boardId } : {}),
     });
 
     return NextResponse.json({ ok: true });

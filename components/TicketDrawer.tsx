@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Link2,
+  ExternalLink,
 } from "lucide-react";
 import {
   Sheet,
@@ -24,17 +25,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Ticket, TicketPriority, TicketStatus, TeamMember } from "@/lib/types";
 import { useTicketData } from "@/lib/ticket-data-context";
-import { cn } from "@/lib/utils";
+import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
 import { TicketLink } from "./TicketLink";
 import { TicketTooltip } from "./TicketTooltip";
 
@@ -48,26 +45,7 @@ const priorityConfig: Record<
   Low: { icon: ChevronDown, className: "text-blue-400" },
 };
 
-const statusColors: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-400",
-  "In Progress": "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",
-  "In Review": "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400",
-  Done: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400",
-};
-
-const statusDots: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-400",
-  "In Progress": "bg-blue-500",
-  "In Review": "bg-yellow-500",
-  Done: "bg-green-500",
-};
-
-const allStatuses: TicketStatus[] = [
-  "To Do",
-  "In Progress",
-  "In Review",
-  "Done",
-];
+// Status colors and labels now come from real Jira status via getStatusBadgeColor
 
 const linkTypeLabels: Record<string, string> = {
   "blocks": "Blocks",
@@ -426,9 +404,35 @@ export function TicketDrawer({
                 L2
               </Badge>
             )}
+            {process.env.NEXT_PUBLIC_JIRA_URL && (
+              <a
+                href={`${process.env.NEXT_PUBLIC_JIRA_URL}/browse/${ticket.key}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
+                title="Open in Jira"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
           </div>
           <SheetTitle className="text-base leading-snug font-semibold pr-6">
-            {ticket.summary}
+            {(() => {
+              const { tags, rest } = parseSummaryTags(ticket.summary);
+              return (
+                <>
+                  {tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center rounded px-1.5 py-0.5 mr-1.5 text-[10px] font-medium bg-accent text-accent-foreground/70 align-middle"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {rest}
+                </>
+              );
+            })()}
           </SheetTitle>
         </SheetHeader>
 
@@ -442,32 +446,15 @@ export function TicketDrawer({
             {/* Status */}
             <div className="flex items-center">
               <span className="w-24 text-muted-foreground shrink-0">Status</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className={cn(
-                    "inline-flex items-center rounded-md px-2 py-0.5 text-xxs font-medium cursor-pointer",
-                    statusColors[ticket.status]
-                  )}
-                >
-                  {ticket.status}
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {allStatuses.map((s) => (
-                    <DropdownMenuItem
-                      key={s}
-                      onClick={() => onStatusChange(ticket, s)}
-                    >
-                      <span
-                        className={cn(
-                          "mr-2 h-2 w-2 rounded-full inline-block",
-                          statusDots[s]
-                        )}
-                      />
-                      {s}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <span
+                className={cn(
+                  statusBadgeBase,
+                  "text-[10px] px-1.5 py-0.5",
+                  getStatusBadgeColor(ticket.statusCategory)
+                )}
+              >
+                {ticket.status.toUpperCase()}
+              </span>
             </div>
 
             {/* Priority */}
@@ -497,25 +484,23 @@ export function TicketDrawer({
 
             {/* Epic — clickable to show siblings */}
             {ticket.epicName && (
-              <div className="flex items-start">
+              <div className="flex items-center">
                 <span className="w-24 text-muted-foreground shrink-0">Epic</span>
                 <div className="flex-1 min-w-0">
                   <button
                     onClick={() => setEpicExpanded(!epicExpanded)}
-                    className="flex items-center gap-1.5 hover:text-foreground transition-colors group"
+                    className="inline-flex items-center gap-1.5 max-w-full hover:text-foreground transition-colors rounded px-1.5 py-0.5 -mx-1.5 hover:bg-surface-hover"
                   >
                     <span
-                      className="h-2.5 w-2.5 rounded-full shrink-0"
+                      className="h-2 w-2 rounded-full shrink-0"
                       style={{ backgroundColor: ticket.epicColor || "#6B7280" }}
                     />
-                    <span>{ticket.epicName}</span>
-                    {epicSiblings.length > 0 && (
-                      <span className="text-muted-foreground/50 text-xxs ml-0.5">
-                        ({epicSiblings.length + 1})
-                      </span>
-                    )}
+                    <span className="truncate">{ticket.epicName}</span>
+                    <span className="text-muted-foreground/50 text-xxs shrink-0">
+                      ({epicSiblings.length + 1})
+                    </span>
                     <ChevronRight className={cn(
-                      "h-3 w-3 text-muted-foreground transition-transform duration-150",
+                      "h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150",
                       epicExpanded && "rotate-90"
                     )} />
                   </button>
@@ -532,9 +517,28 @@ export function TicketDrawer({
                             onClick={() => onTicketSelect?.(t)}
                             className="w-full flex items-center gap-1.5 py-0.5 text-xxs text-left hover:text-foreground transition-colors group"
                           >
-                            <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", statusDots[t.status])} />
                             <span className="font-mono text-muted-foreground">{t.key}</span>
-                            <span className="truncate flex-1">{t.summary}</span>
+                            <span className="truncate flex-1">
+                              {(() => {
+                                const { tags, rest } = parseSummaryTags(t.summary);
+                                return (
+                                  <>
+                                    {tags.map((tag, i) => (
+                                      <span
+                                        key={i}
+                                        className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                    {rest}
+                                  </>
+                                );
+                              })()}
+                            </span>
+                            <span className={cn(statusBadgeBase, "text-[8px] px-0.5 py-px shrink-0", getStatusBadgeColor(t.statusCategory))}>
+                              {t.status.toUpperCase()}
+                            </span>
                           </button>
                         </TicketTooltip>
                       ))}
@@ -593,9 +597,28 @@ export function TicketDrawer({
                         <span className="text-xxs text-muted-foreground/60 w-[70px] shrink-0">
                           {linkTypeLabels[link.type]}
                         </span>
-                        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", statusDots[t.status])} />
                         <span className="font-mono text-xxs text-muted-foreground shrink-0">{t.key}</span>
-                        <span className="truncate flex-1 text-xxs">{t.summary}</span>
+                        <span className="truncate flex-1 text-xxs">
+                          {(() => {
+                            const { tags, rest } = parseSummaryTags(t.summary);
+                            return (
+                              <>
+                                {tags.map((tag, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {rest}
+                              </>
+                            );
+                          })()}
+                        </span>
+                        <span className={cn(statusBadgeBase, "text-[8px] px-0.5 py-px shrink-0", getStatusBadgeColor(t.statusCategory))}>
+                          {t.status.toUpperCase()}
+                        </span>
                       </button>
                     </TicketTooltip>
                   );

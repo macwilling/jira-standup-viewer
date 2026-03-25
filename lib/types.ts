@@ -1,4 +1,5 @@
-export type TicketStatus = "To Do" | "In Progress" | "In Review" | "Done";
+export type TicketStatus = string;
+export type StatusCategory = "new" | "indeterminate" | "done";
 export type TicketPriority = "Highest" | "High" | "Medium" | "Low";
 export type TicketType = "Story" | "Task" | "Subtask" | "Bug" | "Support";
 
@@ -26,6 +27,7 @@ export interface Ticket {
   key: string;
   summary: string;
   status: TicketStatus;
+  statusCategory: StatusCategory;
   priority: TicketPriority;
   type: TicketType;
   assigneeId: string;

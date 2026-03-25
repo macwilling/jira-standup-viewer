@@ -8,7 +8,7 @@ import {
   ChevronDown,
   Search,
   Loader2,
-  Globe,
+  Flame,
 } from "lucide-react";
 import {
   Dialog,
@@ -17,8 +17,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { Ticket, TicketPriority } from "@/lib/types";
+import { cn, getStatusBadgeColor, statusBadgeBase, isStale, parseSummaryTags } from "@/lib/utils";
 
 const priorityIcons: Record<TicketPriority, React.ElementType> = {
   Highest: ChevronsUp,
@@ -32,13 +32,6 @@ const priorityColors: Record<TicketPriority, string> = {
   High: "text-orange-500",
   Medium: "text-yellow-500",
   Low: "text-blue-400",
-};
-
-const statusDotColors: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-400",
-  "In Progress": "bg-blue-400",
-  "In Review": "bg-yellow-400",
-  Done: "bg-green-400",
 };
 
 interface SearchBarProps {
@@ -63,53 +56,60 @@ export function SearchBar({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filtered = useMemo(() => {
-    if (!query.trim()) return tickets;
+    if (!query.trim()) return [];
     const q = query.toLowerCase();
     return tickets.filter(
       (t) =>
         t.key.toLowerCase().includes(q) ||
-        t.summary.toLowerCase().includes(q)
+        t.summary.toLowerCase().includes(q) ||
+        t.status.toLowerCase().includes(q)
     );
   }, [query, tickets]);
 
-  // Debounced global Jira search
+  // Debounced global Jira search with request cancellation
+  const abortRef = useRef<AbortController | null>(null);
   const searchJira = useCallback((q: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (q.length < 3) {
+    // Cancel any in-flight request
+    if (abortRef.current) abortRef.current.abort();
+    if (q.length < 2) {
       setRemoteResults([]);
       setSearching(false);
       return;
     }
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const res = await fetch(`/api/jira/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(
+          `/api/jira/search?q=${encodeURIComponent(q)}&limit=20`,
+          { signal: controller.signal }
+        );
         if (res.ok) {
           const data = await res.json();
           setRemoteResults(data.tickets || []);
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          // ignore non-abort errors
+        }
       } finally {
-        setSearching(false);
+        if (!controller.signal.aborted) setSearching(false);
       }
-    }, 300);
+    }, 400);
   }, []);
 
   useEffect(() => {
     searchJira(query);
   }, [query, searchJira]);
 
-  // Merge local + remote, deduplicate by key
-  const mergedResults = useMemo(() => {
+  // Merge local + remote into a flat list, deduplicated by key
+  const allFiltered = useMemo(() => {
     const localKeys = new Set(filtered.map((t) => t.key));
     const uniqueRemote = remoteResults.filter((t) => !localKeys.has(t.key));
-    return { local: filtered, remote: uniqueRemote };
+    return [...filtered, ...uniqueRemote];
   }, [filtered, remoteResults]);
-
-  const sprintTickets = mergedResults.local.filter((t) => !t.isL2);
-  const l2Tickets = mergedResults.local.filter((t) => t.isL2);
-  const allFiltered = [...sprintTickets, ...l2Tickets, ...mergedResults.remote];
 
   useEffect(() => {
     if (open) {
@@ -157,95 +157,45 @@ export function SearchBar({
         <DialogDescription>Search for tickets by key or keyword</DialogDescription>
       </DialogHeader>
       <DialogContent
-        className="top-[20%] translate-y-0 overflow-hidden rounded-lg! p-0 sm:max-w-lg"
+        className="top-[20%] translate-y-0 overflow-hidden rounded-lg! p-0 gap-0 sm:max-w-xl"
         showCloseButton={false}
       >
-        <div onKeyDown={handleKeyDown}>
-          <div className="flex items-center gap-2 border-b px-3 py-1.5">
-            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <div onKeyDown={handleKeyDown} className="w-full min-w-0 overflow-hidden">
+          <div className="flex items-center gap-2 border-b px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tickets..."
+              placeholder="Search by key, summary, or status..."
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
+            {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            <kbd className="hidden sm:inline-flex h-5 items-center rounded border bg-muted px-1.5 text-[10px] text-muted-foreground">
+              ESC
+            </kbd>
           </div>
 
-          <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
-            {allFiltered.length === 0 ? (
-              <p className="py-4 text-center text-xs text-muted-foreground">
-                No tickets found.
+          <div ref={listRef} className="max-h-[400px] overflow-y-auto py-1">
+            {allFiltered.length === 0 && !searching ? (
+              <p className="py-8 text-center text-xs text-muted-foreground">
+                {query.length > 0 ? "No tickets found" : "Type to search all Jira tickets"}
               </p>
             ) : (
               <>
-                {sprintTickets.length > 0 && (
-                  <div className="p-1">
-                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide">
-                      Sprint
-                    </p>
-                    {sprintTickets.map((ticket) => {
-                      const globalIndex = allFiltered.indexOf(ticket);
-                      return (
-                        <SearchResultItem
-                          key={ticket.key}
-                          ticket={ticket}
-                          isSelected={globalIndex === selectedIndex}
-                          dataIndex={globalIndex}
-                          onSelect={handleSelect}
-                          onHover={() => setSelectedIndex(globalIndex)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-
-                {l2Tickets.length > 0 && (
-                  <div className="p-1">
-                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide">
-                      L2 / Support
-                    </p>
-                    {l2Tickets.map((ticket) => {
-                      const globalIndex = allFiltered.indexOf(ticket);
-                      return (
-                        <SearchResultItem
-                          key={ticket.key}
-                          ticket={ticket}
-                          isSelected={globalIndex === selectedIndex}
-                          dataIndex={globalIndex}
-                          onSelect={handleSelect}
-                          onHover={() => setSelectedIndex(globalIndex)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-
-                {mergedResults.remote.length > 0 && (
-                  <div className="p-1">
-                    <p className="px-2 py-1 text-xxs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                      <Globe className="h-3 w-3" />
-                      Jira Search
-                    </p>
-                    {mergedResults.remote.map((ticket) => {
-                      const globalIndex = allFiltered.indexOf(ticket);
-                      return (
-                        <SearchResultItem
-                          key={ticket.key}
-                          ticket={ticket}
-                          isSelected={globalIndex === selectedIndex}
-                          dataIndex={globalIndex}
-                          onSelect={handleSelect}
-                          onHover={() => setSelectedIndex(globalIndex)}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-
+                {allFiltered.map((ticket, i) => (
+                  <SearchResultItem
+                    key={ticket.key}
+                    ticket={ticket}
+                    isSelected={i === selectedIndex}
+                    dataIndex={i}
+                    onSelect={handleSelect}
+                    onHover={() => setSelectedIndex(i)}
+                  />
+                ))}
                 {searching && (
-                  <div className="flex items-center justify-center gap-1.5 py-2 text-xxs text-muted-foreground">
+                  <div className="flex items-center justify-center gap-1.5 py-3 text-xxs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Searching Jira...
                   </div>
@@ -253,11 +203,22 @@ export function SearchBar({
               </>
             )}
           </div>
+
+          {allFiltered.length > 0 && (
+            <div className="border-t px-3 py-1.5 flex items-center gap-3 text-[10px] text-muted-foreground">
+              <span><kbd className="font-mono">↑↓</kbd> navigate</span>
+              <span><kbd className="font-mono">↵</kbd> open</span>
+              <span><kbd className="font-mono">esc</kbd> close</span>
+              <span className="ml-auto">{allFiltered.length} result{allFiltered.length !== 1 ? "s" : ""}</span>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+
 
 function SearchResultItem({
   ticket,
@@ -273,32 +234,60 @@ function SearchResultItem({
   onHover: () => void;
 }) {
   const Icon = priorityIcons[ticket.priority];
+  const stale = isStale(ticket);
   return (
     <button
       data-index={dataIndex}
       onClick={() => onSelect(ticket)}
       onMouseEnter={onHover}
       className={cn(
-        "flex w-full items-center gap-2 rounded-sm px-2 py-1 h-8 text-left text-sm transition-colors",
-        isSelected ? "bg-surface-hover text-foreground" : "text-foreground/80 hover:bg-surface-hover/50"
+        "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors min-w-0",
+        isSelected ? "bg-accent/60" : "hover:bg-accent/30"
       )}
     >
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full shrink-0",
-          statusDotColors[ticket.status]
-        )}
-      />
-      <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px]">
-        {ticket.key}
-      </span>
-      <span className="truncate flex-1">{ticket.summary}</span>
+      {/* Priority icon */}
       <Icon
         className={cn(
-          "h-3.5 w-3.5 shrink-0 opacity-40",
+          "h-3.5 w-3.5 shrink-0",
           priorityColors[ticket.priority]
         )}
       />
+      {/* Ticket key */}
+      <span className="font-mono text-xs text-muted-foreground shrink-0 w-[72px]">
+        {ticket.key}
+      </span>
+      {/* Summary */}
+      <span className="truncate flex-1 text-[13px]">
+        {(() => {
+          const { tags, rest } = parseSummaryTags(ticket.summary);
+          return (
+            <>
+              {tags.map((tag, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+                >
+                  {tag}
+                </span>
+              ))}
+              {rest}
+            </>
+          );
+        })()}
+      </span>
+      {/* Right side: stale + status */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        {stale && <Flame className="h-3 w-3 text-amber-500" />}
+        <span
+          className={cn(
+            statusBadgeBase,
+            "text-[9px] px-1.5 py-0.5",
+            getStatusBadgeColor(ticket.statusCategory)
+          )}
+        >
+          {ticket.status.toUpperCase()}
+        </span>
+      </div>
     </button>
   );
 }

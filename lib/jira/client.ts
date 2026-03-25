@@ -1,6 +1,6 @@
-import { JiraSearchResponse } from "./types";
+import { JiraSearchResponse, JiraSprint } from "./types";
 
-const JIRA_FIELDS = [
+const BASE_FIELDS = [
   "summary",
   "status",
   "priority",
@@ -14,9 +14,15 @@ const JIRA_FIELDS = [
   "attachment",
   "parent",
   "customfield_10014", // Epic Link (classic)
-  "customfield_10020", // Sprint
   "customfield_10011", // Epic color
-].join(",");
+];
+
+const DEFAULT_SPRINT_FIELD = "customfield_10020";
+
+function buildFieldsList(sprintFieldId?: string): string {
+  const sprintField = sprintFieldId || DEFAULT_SPRINT_FIELD;
+  return [...BASE_FIELDS, sprintField].join(",");
+}
 
 function getCredentials() {
   const url = process.env.JIRA_URL;
@@ -35,6 +41,39 @@ function getCredentials() {
 
 export function hasJiraCredentials(): boolean {
   return getCredentials() !== null;
+}
+
+/** Fetch epic color via Agile API. Returns a hex color or null. */
+export async function fetchEpicColor(epicKey: string): Promise<string | null> {
+  try {
+    const data = await jiraFetch<{ color?: { key?: string } }>(
+      `/rest/agile/1.0/epic/${epicKey}`
+    );
+    // Agile API returns color as { key: "color_1" } etc.
+    return data.color?.key || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Batch-fetch epic colors for a set of epic keys. Returns a map of epicKey -> color name. */
+export async function fetchEpicColors(epicKeys: string[]): Promise<Map<string, string>> {
+  const colorMap = new Map<string, string>();
+  // Fetch in parallel, max 10 concurrent
+  const chunks: string[][] = [];
+  for (let i = 0; i < epicKeys.length; i += 10) {
+    chunks.push(epicKeys.slice(i, i + 10));
+  }
+  for (const chunk of chunks) {
+    const results = await Promise.allSettled(
+      chunk.map(async (key) => {
+        const color = await fetchEpicColor(key);
+        if (color) colorMap.set(key, color);
+      })
+    );
+    void results; // consume
+  }
+  return colorMap;
 }
 
 async function jiraFetch<T>(
@@ -71,11 +110,12 @@ async function jiraFetch<T>(
 export async function searchIssues(
   jql: string,
   maxResults = 100,
-  nextPageToken?: string
+  nextPageToken?: string,
+  sprintFieldId?: string
 ): Promise<JiraSearchResponse> {
   const params: Record<string, string> = {
     jql,
-    fields: JIRA_FIELDS,
+    fields: buildFieldsList(sprintFieldId),
     maxResults: String(maxResults),
   };
   if (nextPageToken) {
@@ -84,12 +124,15 @@ export async function searchIssues(
   return jiraFetch<JiraSearchResponse>("/rest/api/3/search/jql", params);
 }
 
-export async function searchAllIssues(jql: string): Promise<JiraSearchResponse["issues"]> {
+export async function searchAllIssues(
+  jql: string,
+  sprintFieldId?: string
+): Promise<JiraSearchResponse["issues"]> {
   const allIssues: JiraSearchResponse["issues"] = [];
   let nextPageToken: string | undefined;
 
   while (true) {
-    const response = await searchIssues(jql, 100, nextPageToken);
+    const response = await searchIssues(jql, 100, nextPageToken, sprintFieldId);
     allIssues.push(...response.issues);
 
     if (response.isLast || !response.nextPageToken) {
@@ -107,6 +150,52 @@ export async function searchText(
 ): Promise<JiraSearchResponse> {
   const jql = `text ~ "${query.replace(/"/g, '\\"')}" ORDER BY updated DESC`;
   return searchIssues(jql, maxResults);
+}
+
+// Discover the sprint custom field ID by querying Jira field metadata
+export async function discoverSprintFieldId(): Promise<string | null> {
+  try {
+    const fields = await jiraFetch<Array<{ id: string; name: string; schema?: { custom?: string } }>>(
+      "/rest/api/3/field"
+    );
+    const sprintField = fields.find(
+      (f) => f.name.toLowerCase() === "sprint" || f.schema?.custom === "com.pyxis.greenhopper.jira:gh-sprint"
+    );
+    return sprintField?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+// Discover board IDs from the Jira Agile API
+export async function discoverBoards(): Promise<Array<{ id: number; name: string }>> {
+  try {
+    const data = await jiraFetch<{ values: Array<{ id: number; name: string }> }>(
+      "/rest/agile/1.0/board",
+      { maxResults: "50" }
+    );
+    return data.values || [];
+  } catch {
+    return [];
+  }
+}
+
+// Fetch the active sprint from the Jira Agile board API (fallback when the
+// sprint custom field isn't populated in search results).
+export async function fetchActiveSprint(boardId: string): Promise<JiraSprint | null> {
+  try {
+    const data = await jiraFetch<{ values: JiraSprint[] }>(
+      `/rest/agile/1.0/board/${boardId}/sprint`,
+      { state: "active" }
+    );
+    if (data.values && data.values.length > 0) {
+      return data.values[0];
+    }
+    return null;
+  } catch {
+    // The Agile API may not be available on all Jira instances
+    return null;
+  }
 }
 
 export async function testConnection(): Promise<{

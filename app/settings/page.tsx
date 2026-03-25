@@ -12,7 +12,12 @@ interface ConfigStatus {
   jiraConnected: boolean;
   jiraStatus: { ok: boolean; user?: string; error?: string };
   kvConnected: boolean;
-  config: { jqlFilter: string; l2LabelPatterns: string[] } | null;
+  config: {
+    jqlFilter: string;
+    l2LabelPatterns: string[];
+    sprintFieldId?: string;
+    boardId?: string;
+  } | null;
 }
 
 export default function SettingsPage() {
@@ -25,6 +30,8 @@ export default function SettingsPage() {
 
   const [jqlFilter, setJqlFilter] = useState("");
   const [l2Labels, setL2Labels] = useState("");
+  const [sprintFieldId, setSprintFieldId] = useState("");
+  const [boardId, setBoardId] = useState("");
 
   // Load current config
   useEffect(() => {
@@ -35,6 +42,8 @@ export default function SettingsPage() {
         if (data.config) {
           setJqlFilter(data.config.jqlFilter);
           setL2Labels(data.config.l2LabelPatterns.join(", "));
+          setSprintFieldId(data.config.sprintFieldId || "");
+          setBoardId(data.config.boardId || "");
         }
       })
       .catch(() => {})
@@ -54,6 +63,8 @@ export default function SettingsPage() {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
+          ...(sprintFieldId.trim() ? { sprintFieldId: sprintFieldId.trim() } : {}),
+          ...(boardId.trim() ? { boardId: boardId.trim() } : {}),
         }),
       });
       if (res.ok) setSaved(true);
@@ -172,6 +183,36 @@ export default function SettingsPage() {
               />
               <p className="text-xxs text-muted-foreground">
                 Comma-separated labels. Tickets with any of these labels are shown as L2/Support.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sprintField" className="text-xs">Sprint Custom Field ID</Label>
+              <Input
+                id="sprintField"
+                value={sprintFieldId}
+                onChange={(e) => setSprintFieldId(e.target.value)}
+                placeholder="customfield_10020"
+                className="text-xs font-mono"
+              />
+              <p className="text-xxs text-muted-foreground">
+                The Jira custom field that holds sprint data. Defaults to <code className="bg-muted px-1 rounded">customfield_10020</code>.
+                Check your Jira field configuration if the sprint name does not appear.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="boardId" className="text-xs">Board ID (optional fallback)</Label>
+              <Input
+                id="boardId"
+                value={boardId}
+                onChange={(e) => setBoardId(e.target.value)}
+                placeholder="42"
+                className="text-xs font-mono"
+              />
+              <p className="text-xxs text-muted-foreground">
+                If sprint info isn&apos;t in issue fields, the dashboard will use the Jira Agile board API to find the active sprint.
+                Find the board ID in your board&apos;s URL: <code className="bg-muted px-1 rounded">/board/42</code>.
               </p>
             </div>
           </div>

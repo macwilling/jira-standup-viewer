@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
 import { TicketTooltip } from "./TicketTooltip";
 
 // Matches bare Jira keys (PROJECT-123) or Jira browse URLs containing a key
@@ -15,13 +15,6 @@ function extractKey(match: string): string {
   const m = match.match(/([A-Z][A-Z0-9]+-\d+)$/);
   return m ? m[1] : match;
 }
-
-const statusDotColors: Record<string, string> = {
-  "To Do": "bg-slate-400",
-  "In Progress": "bg-blue-500",
-  "In Review": "bg-yellow-500",
-  Done: "bg-green-500",
-};
 
 function shortenSummary(summary: string, maxLen = 40): string {
   if (summary.length <= maxLen) return summary;
@@ -121,15 +114,34 @@ function TicketChip({
           "border border-border/40"
         )}
       >
-        <span
-          className={cn(
-            "inline-block h-1.5 w-1.5 rounded-full align-middle mr-0.5",
-            statusDotColors[ticket.status] || "bg-slate-400"
-          )}
-        />
         <span className="font-mono font-medium text-foreground/70">{ticket.key}</span>
         {" "}
-        <span className="text-muted-foreground font-normal">{shortenSummary(ticket.summary)}</span>
+        {(() => {
+          const { tags, rest } = parseSummaryTags(ticket.summary);
+          return (
+            <>
+              {tags.map((tag, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center rounded px-1 py-px mr-0.5 text-[8px] font-medium bg-accent text-accent-foreground/70"
+                >
+                  {tag}
+                </span>
+              ))}
+              <span className="text-muted-foreground font-normal">{shortenSummary(rest)}</span>
+            </>
+          );
+        })()}
+        {" "}
+        <span
+          className={cn(
+            statusBadgeBase,
+            "text-[8px] px-0.5 py-px ml-0.5 align-middle",
+            getStatusBadgeColor(ticket.statusCategory)
+          )}
+        >
+          {ticket.status.toUpperCase()}
+        </span>
       </span>
     </TicketTooltip>
   );

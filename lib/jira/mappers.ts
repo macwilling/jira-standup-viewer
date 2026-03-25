@@ -9,34 +9,17 @@ import {
   LinkType,
   Sprint,
 } from "@/lib/types";
-import { JiraIssue, JiraIssueLink, JiraAdfNode, JiraComment } from "./types";
+import { JiraIssue, JiraIssueLink, JiraAdfNode, JiraComment, JiraSprint } from "./types";
 
 // --- Status mapping ---
+// We pass through the real Jira status name and use statusCategory for color coding
 
-const STATUS_MAP: Record<string, TicketStatus> = {
-  "to do": "To Do",
-  "open": "To Do",
-  "backlog": "To Do",
-  "new": "To Do",
-  "selected for development": "To Do",
-  "in progress": "In Progress",
-  "in development": "In Progress",
-  "in flight": "In Progress",
-  "active": "In Progress",
-  "in review": "In Review",
-  "code review": "In Review",
-  "review": "In Review",
-  "awaiting review": "In Review",
-  "done": "Done",
-  "closed": "Done",
-  "resolved": "Done",
-  "complete": "Done",
-  "released": "Done",
-};
+import { StatusCategory } from "@/lib/types";
 
-export function mapJiraStatus(jiraStatus: string): TicketStatus {
-  const normalized = jiraStatus.toLowerCase().trim();
-  return STATUS_MAP[normalized] ?? "To Do";
+export function mapJiraStatusCategory(categoryKey: string): StatusCategory {
+  if (categoryKey === "done") return "done";
+  if (categoryKey === "indeterminate") return "indeterminate";
+  return "new";
 }
 
 // --- Priority mapping ---
@@ -351,7 +334,9 @@ export function mapJiraIssue(
   }
 
   if (fields.customfield_10011) {
-    epicColor = EPIC_COLORS[fields.customfield_10011] || fields.customfield_10011;
+    // Only use customfield_10011 if it's a recognized color name (not Jira internal metadata)
+    const mapped = EPIC_COLORS[fields.customfield_10011];
+    if (mapped) epicColor = mapped;
   }
 
   // Build attachment map — index by both numeric ID and filename for flexible matching
@@ -367,7 +352,8 @@ export function mapJiraIssue(
   return {
     key: issue.key,
     summary: fields.summary,
-    status: mapJiraStatus(fields.status.name),
+    status: fields.status.name,
+    statusCategory: mapJiraStatusCategory(fields.status.statusCategory?.key || "new"),
     priority: mapJiraPriority(fields.priority?.name || "Medium"),
     type: mapJiraType(fields.issuetype.name),
     assigneeId: fields.assignee?.accountId || "unassigned",
@@ -416,16 +402,37 @@ export function extractTeamMembers(issues: JiraIssue[]): TeamMember[] {
 
 // --- Extract sprint from issues ---
 
-export function extractSprint(issues: JiraIssue[]): Sprint | null {
+export function extractSprint(
+  issues: JiraIssue[],
+  sprintFieldId?: string
+): Sprint | null {
+  const fieldKey = sprintFieldId || "customfield_10020";
+
   for (const issue of issues) {
-    const sprints = issue.fields.customfield_10020;
-    if (sprints && sprints.length > 0) {
+    // Try the configured/default sprint field
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sprints = (issue.fields as any)[fieldKey] as JiraSprint[] | null | undefined;
+    if (sprints && Array.isArray(sprints) && sprints.length > 0) {
       const active = sprints.find((s) => s.state === "active") || sprints[0];
       return {
         name: active.name,
         startDate: active.startDate?.split("T")[0] || "",
         endDate: active.endDate?.split("T")[0] || "",
       };
+    }
+
+    // Fallback: also check the hardcoded customfield_10020 in case the
+    // configured field ID is different but the default is populated
+    if (fieldKey !== "customfield_10020") {
+      const fallbackSprints = issue.fields.customfield_10020;
+      if (fallbackSprints && fallbackSprints.length > 0) {
+        const active = fallbackSprints.find((s) => s.state === "active") || fallbackSprints[0];
+        return {
+          name: active.name,
+          startDate: active.startDate?.split("T")[0] || "",
+          endDate: active.endDate?.split("T")[0] || "",
+        };
+      }
     }
   }
   return null;

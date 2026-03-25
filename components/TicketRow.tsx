@@ -7,9 +7,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { StaleIndicator } from "./StaleIndicator";
-import { Ticket, TicketPriority, TicketStatus } from "@/lib/types";
+import { Ticket, TicketPriority } from "@/lib/types";
 import { useTicketData } from "@/lib/ticket-data-context";
-import { cn } from "@/lib/utils";
+import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags, getEpicColor } from "@/lib/utils";
 
 const priorityConfig: Record<
   TicketPriority,
@@ -19,13 +19,6 @@ const priorityConfig: Record<
   High: { icon: ChevronUp, className: "text-orange-500" },
   Medium: { icon: Equal, className: "text-yellow-500" },
   Low: { icon: ChevronDown, className: "text-blue-400" },
-};
-
-const statusDotColors: Record<TicketStatus, string> = {
-  "To Do": "bg-slate-400",
-  "In Progress": "bg-blue-400",
-  "In Review": "bg-yellow-400",
-  Done: "bg-green-400",
 };
 
 interface TicketRowProps {
@@ -39,22 +32,42 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
   const { icon: PriorityIcon, className: priorityClass } =
     priorityConfig[ticket.priority];
   const stale = isStale(ticket);
+  const { tags, rest } = parseSummaryTags(ticket.summary);
 
   return (
     <button
       onClick={() => onSelect(ticket)}
       className="w-full flex items-center gap-2 px-2 pr-4 py-1 h-8 rounded-sm text-left transition-colors hover:bg-surface-hover group"
     >
-      <span
-        className={cn(
-          "h-2 w-2 rounded-full shrink-0",
-          statusDotColors[ticket.status]
-        )}
-      />
       <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px]">
         {ticket.key}
       </span>
-      <span className="text-sm truncate flex-1">{ticket.summary}</span>
+      <span className="text-sm truncate flex-1">
+        {tags.map((tag, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+          >
+            {tag}
+          </span>
+        ))}
+        {rest}
+      </span>
+      {ticket.epicName && (() => {
+        const color = getEpicColor(ticket.epicName, ticket.epicColor);
+        return (
+          <span
+            className="shrink-0 max-w-[100px] truncate rounded px-1.5 py-px text-[10px] font-medium leading-tight opacity-70 group-hover:opacity-100 transition-opacity"
+            style={{
+              backgroundColor: color + "20",
+              color: color,
+            }}
+            title={ticket.epicName}
+          >
+            {ticket.epicName}
+          </span>
+        );
+      })()}
       <PriorityIcon
         className={cn(
           "h-3.5 w-3.5 shrink-0 opacity-40 group-hover:opacity-80 transition-opacity",
@@ -62,6 +75,15 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
         )}
       />
       {stale && <StaleIndicator lastActivityDate={ticket.lastActivityDate} />}
+      <span
+        className={cn(
+          statusBadgeBase,
+          "text-[9px] px-1 py-0.5 shrink-0",
+          getStatusBadgeColor(ticket.statusCategory)
+        )}
+      >
+        {ticket.status.toUpperCase()}
+      </span>
     </button>
   );
 }

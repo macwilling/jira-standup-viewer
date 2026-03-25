@@ -10,21 +10,7 @@ import {
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketPriority } from "@/lib/types";
-import { cn } from "@/lib/utils";
-
-const statusDotColors: Record<string, string> = {
-  "To Do": "bg-slate-400",
-  "In Progress": "bg-blue-500",
-  "In Review": "bg-yellow-500",
-  Done: "bg-green-500",
-};
-
-const statusLabels: Record<string, string> = {
-  "To Do": "To Do",
-  "In Progress": "In Progress",
-  "In Review": "In Review",
-  Done: "Done",
-};
+import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
 
 const priorityIcons: Record<TicketPriority, React.ElementType> = {
   Highest: ChevronsUp,
@@ -98,14 +84,34 @@ export function TicketTooltip({
                 )}
               </div>
               <p className="text-sm font-medium leading-snug mt-0.5">
-                {ticket.summary}
+                {(() => {
+                  const { tags, rest } = parseSummaryTags(ticket.summary);
+                  return (
+                    <>
+                      {tags.map((tag, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {rest}
+                    </>
+                  );
+                })()}
               </p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap text-xxs">
-              <span className="inline-flex items-center gap-1">
-                <span className={cn("h-1.5 w-1.5 rounded-full", statusDotColors[ticket.status])} />
-                {statusLabels[ticket.status]}
+              <span
+                className={cn(
+                  statusBadgeBase,
+                  "text-[9px] px-1 py-0.5",
+                  getStatusBadgeColor(ticket.statusCategory)
+                )}
+              >
+                {ticket.status.toUpperCase()}
               </span>
 
               <span className="text-border">|</span>

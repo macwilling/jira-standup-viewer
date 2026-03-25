@@ -1,6 +1,8 @@
 export interface DashboardConfig {
   jqlFilter: string;
   l2LabelPatterns: string[];
+  sprintFieldId?: string; // Custom field ID for sprint (defaults to "customfield_10020")
+  boardId?: string; // Jira Agile board ID — used as fallback to fetch active sprint
 }
 
 const CONFIG_KEY = "dashboard-config";

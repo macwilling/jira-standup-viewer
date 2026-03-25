@@ -28,15 +28,20 @@ export default function Home() {
   );
 
   const membersWithTickets: TeamMemberWithTickets[] = useMemo(() => {
-    return teamMembers.map((member) => {
-      const memberTickets = tickets.filter(
-        (t) => t.assigneeId === member.id
+    return teamMembers
+      .map((member) => {
+        const memberTickets = tickets.filter(
+          (t) => t.assigneeId === member.id
+        );
+        const sprintTickets = memberTickets.filter((t) => !t.isL2);
+        const l2Tickets = memberTickets.filter((t) => t.isL2);
+        const staleCount = memberTickets.filter((t) => isStale(t)).length;
+        return { ...member, sprintTickets, l2Tickets, staleCount };
+      })
+      .filter(
+        (member) =>
+          member.sprintTickets.length + member.l2Tickets.length > 0
       );
-      const sprintTickets = memberTickets.filter((t) => !t.isL2);
-      const l2Tickets = memberTickets.filter((t) => t.isL2);
-      const staleCount = memberTickets.filter((t) => isStale(t)).length;
-      return { ...member, sprintTickets, l2Tickets, staleCount };
-    });
   }, [teamMembers, tickets, isStale]);
 
   const toggleMember = useCallback((id: string) => {
