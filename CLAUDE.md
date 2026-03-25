@@ -1,0 +1,63 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Jira Standup Viewer — a Next.js 14 (App Router) dashboard for facilitating scrum standups. Fetches tickets from Jira Cloud, groups them by team member and status, and displays sprint progress. Built with TypeScript, Tailwind CSS, and shadcn/ui components.
+
+## Commands
+
+- `npm run dev` — Start development server
+- `npm run build` — Production build
+- `npm run lint` — ESLint
+
+No test framework is configured.
+
+## Architecture
+
+### Data Flow
+
+```
+SWR (5min poll) → /api/jira/tickets → Jira Cloud REST API
+                                      ├── searchAllIssues(jqlFilter)
+                                      ├── fetchEpicColors (Agile API)
+                                      └── mapJiraIssue (ADF → Markdown)
+```
+
+### Key Layers
+
+- **`app/api/jira/`** — Server-side API routes that proxy Jira Cloud (Basic Auth). Endpoints: `tickets`, `issues`, `search`, `attachment`, `epic-children`.
+- **`lib/jira/client.ts`** — Jira HTTP client with credential handling.
+- **`lib/jira/mappers.ts`** — Converts Jira responses to app types. Includes ADF (Atlassian Document Format) → Markdown/HTML conversion, status category mapping, and epic color resolution.
+- **`lib/jira/types.ts`** — Jira API response type definitions.
+- **`lib/types.ts`** — App-level types (Ticket, TeamMember, Sprint).
+- **`lib/ticket-data-context.tsx`** — React Context + SWR provider for global ticket/team/sprint state. Falls back to mock data when unconfigured.
+- **`lib/config.ts`** — Dashboard configuration stored in Cloudflare KV (via Upstash REST API). Stores JQL filter, board ID, sprint field ID, L2 label patterns.
+
+### UI Components
+
+- **`components/TicketDrawer.tsx`** — Largest component; side drawer showing full ticket details with ADF-rendered descriptions, linked tickets, and attachments.
+- **`components/TeamCard.tsx`** — Per-member card with grouped ticket rows.
+- **`components/SearchBar.tsx`** — Command palette (`cmdk`) with `/` keyboard shortcut.
+- **`components/ui/`** — shadcn/ui primitives (do not modify directly; regenerate via shadcn CLI).
+
+### Pages
+
+- `/` — Main dashboard (client component)
+- `/settings` — Configuration UI for JQL filter, L2 labels, sprint field
+
+## Conventions
+
+- Path alias: `@/*` maps to the project root (e.g., `@/lib/utils`, `@/components/ui/button`)
+- Styling: Tailwind CSS with CSS variables for theming (dark mode supported). Uses `cn()` from `lib/utils.ts` for class merging.
+- Component variants use `class-variance-authority` (cva).
+- Icons: Lucide React (`lucide-react`).
+- shadcn config in `components.json` uses `base-nova` style.
+
+## Environment Variables
+
+Required in `.env.local` (see `.env.example`):
+- `JIRA_URL`, `NEXT_PUBLIC_JIRA_URL` — Jira Cloud instance URL
+- `JIRA_EMAIL`, `JIRA_API_TOKEN` — Jira Basic Auth credentials
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_KV_NAMESPACE_ID` — Cloudflare KV for config storage

@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Jira Standup Viewer
+
+A Next.js dashboard for facilitating scrum standups. Fetches tickets from Jira Cloud, groups them by team member and status, and displays sprint progress.
+
+## Features
+
+- Real-time Jira ticket display grouped by team member
+- Sprint progress tracking
+- Epic colors from Jira Agile API
+- Full-text search with command palette (`/` shortcut)
+- Ticket detail drawer with ADF-rendered descriptions
+- Linked ticket display (blocks, blocked by, relates to)
+- Stale ticket detection (7+ days inactive)
+- L2/Support ticket segregation via label patterns
+- Dark mode support
 
 ## Getting Started
 
-First, run the development server:
+1. Copy `.env.example` to `.env.local` and fill in your credentials:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies and start the dev server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Open [http://localhost:3000](http://localhost:3000) and configure your JQL filter in the Settings page.
 
-## Learn More
+## Environment Variables
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Description |
+|----------|-------------|
+| `JIRA_URL` | Jira Cloud instance URL (e.g. `https://yourcompany.atlassian.net`) |
+| `NEXT_PUBLIC_JIRA_URL` | Same URL, exposed to the client for ticket links |
+| `JIRA_EMAIL` | Jira account email for API authentication |
+| `JIRA_API_TOKEN` | Jira API token ([create one here](https://id.atlassian.com/manage-profile/security/api-tokens)) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token for KV access |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID |
+| `CLOUDFLARE_KV_NAMESPACE_ID` | Cloudflare KV namespace ID for config storage |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — Start development server
+- `npm run build` — Production build
+- `npm run start` — Start production server
+- `npm run lint` — Run ESLint
