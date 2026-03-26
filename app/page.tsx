@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Loader2, Settings, LogOut } from "lucide-react";
+import { Search, Loader2, Settings, LogOut, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamCard } from "@/components/TeamCard";
@@ -20,6 +20,7 @@ export default function Home() {
     error,
     configured,
     isStale,
+    refresh,
   } = useTicketData();
 
   const router = useRouter();
@@ -28,6 +29,16 @@ export default function Home() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   };
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(() => {
+    if (refreshing) return;
+    setRefreshing(true);
+    const minSpin = new Promise((r) => setTimeout(r, 600));
+    const fetched = refresh();
+    Promise.all([minSpin, fetched]).finally(() => setRefreshing(false));
+  }, [refreshing, refresh]);
 
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketHistory, setTicketHistory] = useState<Ticket[]>([]);
@@ -157,6 +168,14 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-1 ml-2 border-l pl-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+                title="Refresh tickets"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              </button>
               <Link
                 href="/settings"
                 className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
