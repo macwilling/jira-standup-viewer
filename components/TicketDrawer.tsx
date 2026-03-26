@@ -83,6 +83,51 @@ function formatRelativeTime(dateStr: string): string {
   return `${days}d ago`;
 }
 
+// Fields where the from/to values are short enough to show inline
+const INLINE_FIELDS = new Set([
+  "Status", "Assignee", "Priority", "Type", "Resolution",
+  "Sprint", "Labels", "Fix Version", "Component", "Story Points",
+]);
+
+// Max length for a value to be shown inline even for non-whitelisted fields
+const INLINE_MAX_LEN = 60;
+
+function summarizeChange(change: { field: string; from: string | null; to: string | null }): {
+  summary: string;
+  hasDetail: boolean;
+} {
+  const { field, from, to } = change;
+
+  // Status is always inline (rendered with badges separately)
+  if (field === "Status") return { summary: "", hasDetail: false };
+
+  // Short-value fields: always show inline
+  if (INLINE_FIELDS.has(field)) {
+    if (!from && to) return { summary: `${to}`, hasDetail: false };
+    if (from && !to) return { summary: `removed`, hasDetail: false };
+    if (from && to) return { summary: `${from} \u2192 ${to}`, hasDetail: false };
+    return { summary: "cleared", hasDetail: false };
+  }
+
+  // For longer fields, check actual value lengths
+  const fromLen = from?.length || 0;
+  const toLen = to?.length || 0;
+
+  if (fromLen <= INLINE_MAX_LEN && toLen <= INLINE_MAX_LEN) {
+    // Short enough to show inline
+    if (!from && to) return { summary: to, hasDetail: false };
+    if (from && !to) return { summary: "removed", hasDetail: false };
+    if (from && to) return { summary: `${from} \u2192 ${to}`, hasDetail: false };
+    return { summary: "cleared", hasDetail: false };
+  }
+
+  // Long values — show action verb only
+  if (!from && to) return { summary: "added", hasDetail: true };
+  if (from && !to) return { summary: "removed", hasDetail: true };
+  if (from && to) return { summary: "updated", hasDetail: true };
+  return { summary: "cleared", hasDetail: false };
+}
+
 function formatChangelogTimestamp(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
@@ -125,6 +170,7 @@ export function TicketDrawer({
   const [activityExpanded, setActivityExpanded] = useState(false);
   const [changelog, setChangelog] = useState<ChangelogEntry[]>([]);
   const [changelogLoading, setChangelogLoading] = useState(false);
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
 
   // Linked tickets state
   const [fetchedLinks, setFetchedLinks] = useState<
@@ -147,6 +193,7 @@ export function TicketDrawer({
     setActivityExpanded(false);
     setChangelog([]);
     setChangelogLoading(false);
+    setExpandedEntries(new Set());
 
     // Fetch epic children
     if (ticket.epicKey) {
@@ -609,47 +656,103 @@ export function TicketDrawer({
                       </div>
 
                       {/* Entry content */}
-                      <div className="pb-4 min-w-0 flex-1">
-                        {/* Author + timestamp row */}
-                        <div className="flex items-center gap-1.5 text-xs leading-tight">
-                          <span className="font-medium text-foreground truncate">{entry.authorName}</span>
-                          <span className="text-muted-foreground/60 shrink-0">&middot;</span>
-                          <span className="text-muted-foreground text-xxs shrink-0 tabular-nums">
-                            {formatChangelogTimestamp(entry.created)}
-                          </span>
-                        </div>
+                      {(() => {
+                        const isExpanded = expandedEntries.has(entry.id);
+                        const hasAnyDetail = entry.changes.some((c) => summarizeChange(c).hasDetail);
+                        return (
+                          <div className="pb-4 min-w-0 flex-1">
+                            {/* Author + timestamp row */}
+                            <div className="flex items-center gap-1.5 text-xs leading-tight">
+                              <span className="font-medium text-foreground truncate">{entry.authorName}</span>
+                              <span className="text-muted-foreground/60 shrink-0">&middot;</span>
+                              <span className="text-muted-foreground text-xxs shrink-0 tabular-nums">
+                                {formatChangelogTimestamp(entry.created)}
+                              </span>
+                            </div>
 
-                        {/* Changes */}
-                        <div className="mt-1 space-y-0.5">
-                          {entry.changes.map((change, i) => (
-                            <div key={i} className="text-xs text-muted-foreground leading-relaxed">
-                              <span className="text-foreground/60">{change.field}:</span>{" "}
-                              {change.field === "Status" ? (
-                                <span className="inline-flex items-center gap-1 align-middle">
-                                  {change.from && (
-                                    <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
-                                      {change.from}
-                                    </span>
-                                  )}
-                                  <span className="text-muted-foreground/40">&rarr;</span>
-                                  {change.to && (
-                                    <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
-                                      {change.to}
-                                    </span>
-                                  )}
-                                </span>
-                              ) : (
-                                <span>
-                                  {change.from && <span className="line-through text-muted-foreground/50"><TicketLink text={change.from} onTicketClick={onTicketSelect} /></span>}
-                                  {change.from && change.to && <span className="text-muted-foreground/40"> &rarr; </span>}
-                                  {change.to && <span><TicketLink text={change.to} onTicketClick={onTicketSelect} /></span>}
-                                  {!change.from && !change.to && <span className="italic">cleared</span>}
-                                </span>
+                            {/* Compact changes */}
+                            <div
+                              className={cn(
+                                "mt-1 space-y-0.5",
+                                hasAnyDetail && "cursor-pointer"
+                              )}
+                              onClick={hasAnyDetail ? () => {
+                                setExpandedEntries((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(entry.id)) next.delete(entry.id);
+                                  else next.add(entry.id);
+                                  return next;
+                                });
+                              } : undefined}
+                            >
+                              {entry.changes.map((change, i) => {
+                                const { summary, hasDetail } = summarizeChange(change);
+                                return (
+                                  <div key={i} className="text-xs text-muted-foreground leading-relaxed">
+                                    {change.field === "Status" ? (
+                                      <span className="inline-flex items-center gap-1 align-middle">
+                                        <span className="text-foreground/60">Status:</span>{" "}
+                                        {change.from && (
+                                          <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
+                                            {change.from}
+                                          </span>
+                                        )}
+                                        <span className="text-muted-foreground/40">&rarr;</span>
+                                        {change.to && (
+                                          <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
+                                            {change.to}
+                                          </span>
+                                        )}
+                                      </span>
+                                    ) : (
+                                      <span>
+                                        <span className="text-foreground/60">{change.field}:</span>{" "}
+                                        {hasDetail && !isExpanded ? (
+                                          <span className="italic text-muted-foreground/60">{summary}</span>
+                                        ) : (
+                                          <TicketLink text={summary} onTicketClick={onTicketSelect} />
+                                        )}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {/* Expand hint */}
+                              {hasAnyDetail && (
+                                <div className="text-xxs text-muted-foreground/40 flex items-center gap-0.5 pt-0.5">
+                                  <ChevronRight className={cn(
+                                    "h-2.5 w-2.5 transition-transform duration-150",
+                                    isExpanded && "rotate-90"
+                                  )} />
+                                  {isExpanded ? "hide" : "details"}
+                                </div>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+
+                            {/* Expanded detail */}
+                            {isExpanded && (
+                              <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-border/30">
+                                {entry.changes.filter((c) => summarizeChange(c).hasDetail).map((change, i) => (
+                                  <div key={i} className="text-xxs text-muted-foreground space-y-0.5">
+                                    <div className="font-medium text-foreground/60">{change.field}</div>
+                                    {change.from && (
+                                      <div className="line-through text-muted-foreground/40 break-words whitespace-pre-wrap max-h-20 overflow-y-auto">
+                                        <TicketLink text={change.from} onTicketClick={onTicketSelect} />
+                                      </div>
+                                    )}
+                                    {change.to && (
+                                      <div className="break-words whitespace-pre-wrap max-h-20 overflow-y-auto">
+                                        <TicketLink text={change.to} onTicketClick={onTicketSelect} />
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>

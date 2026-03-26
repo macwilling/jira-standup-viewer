@@ -340,6 +340,8 @@ const FIELD_DISPLAY_NAMES: Record<string, string> = {
   "customfield_10014": "Epic Link",
   "Sprint": "Sprint",
   "Link": "Link",
+  "IssueParentAssociation": "Parent",
+  "Parent": "Parent",
 };
 
 function prettifyFieldName(field: string): string {
