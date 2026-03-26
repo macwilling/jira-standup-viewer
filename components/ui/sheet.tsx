@@ -44,6 +44,7 @@ function SheetContent({
   defaultWidth = 420,
   minWidth = 320,
   maxWidth = 900,
+  storageKey = "sheet-width",
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
@@ -51,32 +52,41 @@ function SheetContent({
   defaultWidth?: number
   minWidth?: number
   maxWidth?: number
+  storageKey?: string
 }) {
-  const [width, setWidth] = React.useState(defaultWidth)
-  const isDragging = React.useRef(false)
+  const [width, setWidth] = React.useState(() => {
+    if (typeof window === "undefined") return defaultWidth
+    const stored = localStorage.getItem(storageKey)
+    if (stored) {
+      const parsed = Number(stored)
+      if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) return parsed
+    }
+    return defaultWidth
+  })
+  const [dragging, setDragging] = React.useState(false)
   const startX = React.useRef(0)
   const startWidth = React.useRef(0)
 
   const handleMouseDown = React.useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
-      isDragging.current = true
+      setDragging(true)
       startX.current = e.clientX
       startWidth.current = width
       document.body.style.cursor = "col-resize"
       document.body.style.userSelect = "none"
 
       const handleMouseMove = (e: MouseEvent) => {
-        if (!isDragging.current) return
         const delta = startX.current - e.clientX
         const newWidth = Math.min(maxWidth, Math.max(minWidth, startWidth.current + delta))
         setWidth(newWidth)
       }
 
       const handleMouseUp = () => {
-        isDragging.current = false
+        setDragging(false)
         document.body.style.cursor = ""
         document.body.style.userSelect = ""
+        // Persist width
         document.removeEventListener("mousemove", handleMouseMove)
         document.removeEventListener("mouseup", handleMouseUp)
       }
@@ -87,6 +97,15 @@ function SheetContent({
     [width, minWidth, maxWidth]
   )
 
+  // Persist width to localStorage whenever dragging ends
+  const prevDragging = React.useRef(dragging)
+  React.useEffect(() => {
+    if (prevDragging.current && !dragging) {
+      localStorage.setItem(storageKey, String(width))
+    }
+    prevDragging.current = dragging
+  }, [dragging, width, storageKey])
+
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -94,19 +113,21 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:border-l data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:border-r data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b",
+          "fixed z-50 flex flex-col bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:border-r data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b",
           className
         )}
         style={{ width: side === "right" || side === "left" ? width : undefined }}
         {...props}
       >
-        {/* Drag handle */}
+        {/* Resize gutter */}
         {(side === "right") && (
           <div
             onMouseDown={handleMouseDown}
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/10 active:bg-primary/20 transition-colors z-10 group"
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 transition-colors duration-150 bg-muted hover:bg-border",
+              dragging && "!bg-border"
+            )}
           >
-            <div className="absolute left-0.5 top-1/2 -translate-y-1/2 w-0.5 h-8 rounded-full bg-border group-hover:bg-primary/40 transition-colors" />
           </div>
         )}
         {children}
