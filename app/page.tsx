@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Settings, LogOut } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TeamCard } from "@/components/TeamCard";
 import { TicketDrawer } from "@/components/TicketDrawer";
 import { SearchBar } from "@/components/SearchBar";
@@ -19,6 +21,13 @@ export default function Home() {
     configured,
     isStale,
   } = useTicketData();
+
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  };
 
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketHistory, setTicketHistory] = useState<Ticket[]>([]);
@@ -133,17 +142,36 @@ export default function Home() {
             </kbd>
           </button>
 
-          <div className="text-right shrink-0">
-            {sprint ? (
-              <>
-                <p className="text-xs font-medium">{sprint.name}</p>
-                <p className="text-xxs text-muted-foreground">
-                  {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
-                </p>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">No active sprint</p>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-right">
+              {sprint ? (
+                <>
+                  <p className="text-xs font-medium">{sprint.name}</p>
+                  <p className="text-xxs text-muted-foreground">
+                    {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">No active sprint</p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 ml-2 border-l pl-2">
+              <Link
+                href="/settings"
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Settings"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                title="Logout"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
