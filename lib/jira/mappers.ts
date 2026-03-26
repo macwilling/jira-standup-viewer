@@ -54,6 +54,7 @@ const TYPE_MAP: Record<string, TicketType> = {
   "support": "Support",
   "service request": "Support",
   "incident": "Support",
+  "epic": "Epic",
 };
 
 export function mapJiraType(jiraType: string): TicketType {

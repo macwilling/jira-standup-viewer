@@ -1,7 +1,7 @@
 export type TicketStatus = string;
 export type StatusCategory = "new" | "indeterminate" | "done";
 export type TicketPriority = "Highest" | "High" | "Medium" | "Low";
-export type TicketType = "Story" | "Task" | "Subtask" | "Bug" | "Support";
+export type TicketType = "Story" | "Task" | "Subtask" | "Bug" | "Support" | "Epic";
 
 export interface TeamMember {
   id: string;

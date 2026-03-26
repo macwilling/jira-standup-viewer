@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Link2,
   ExternalLink,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   Sheet,
@@ -26,13 +27,15 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
 } from "@/components/ui/dropdown-menu";
+import { EpicProgressBar } from "./EpicProgressBar";
+import { EpicChildrenList } from "./EpicChildrenList";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { Ticket, TicketPriority, TicketStatus, TeamMember, ChangelogEntry } from "@/lib/types";
 import { useTicketData } from "@/lib/ticket-data-context";
-import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
+import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags, getEpicColor } from "@/lib/utils";
 import { TicketLink } from "./TicketLink";
 import { TicketTooltip } from "./TicketTooltip";
 
@@ -157,7 +160,7 @@ export function TicketDrawer({
   onBack,
   onBreadcrumbNav,
 }: TicketDrawerProps) {
-  const { isStale } = useTicketData();
+  const { isStale, fetchTicket } = useTicketData();
   const [comment, setComment] = useState("");
   const [epicExpanded, setEpicExpanded] = useState(false);
   const scrollRef = useRef(null as HTMLDivElement | null);
@@ -195,14 +198,19 @@ export function TicketDrawer({
     setChangelogLoading(false);
     setExpandedEntries(new Set());
 
-    // Fetch epic children
-    if (ticket.epicKey) {
+    // Fetch epic children — either siblings (when viewing a child) or own children (when viewing an epic)
+    const epicKeyToFetch = ticket.type === "Epic" ? ticket.key : ticket.epicKey;
+    if (epicKeyToFetch) {
       setEpicLoading(true);
-      fetch(`/api/jira/epic-children?epicKey=${encodeURIComponent(ticket.epicKey)}`)
+      fetch(`/api/jira/epic-children?epicKey=${encodeURIComponent(epicKeyToFetch)}`)
         .then((r) => r.json())
         .then((data) => {
           if (data.tickets) {
-            setEpicChildren(data.tickets.filter((t: Ticket) => t.key !== ticket.key));
+            // When viewing an epic, show all children; when viewing a child, exclude self
+            const children = ticket.type === "Epic"
+              ? data.tickets
+              : data.tickets.filter((t: Ticket) => t.key !== ticket.key);
+            setEpicChildren(children);
           }
         })
         .catch(() => {})
@@ -274,6 +282,11 @@ export function TicketDrawer({
   const resolvedLinks = fetchedLinks;
 
   if (!ticket) return null;
+
+  const isEpic = ticket.type === "Epic";
+  const epicColor = isEpic
+    ? getEpicColor(ticket.summary, ticket.epicColor) || "#7C3AED"
+    : null;
 
   const { icon: PriorityIcon, className: priorityClass } =
     priorityConfig[ticket.priority];
@@ -406,7 +419,13 @@ export function TicketDrawer({
         defaultWidth={420}
       >
         {/* Header */}
-        <SheetHeader className="px-5 pt-4 pb-3 space-y-2 border-b shrink-0">
+        <SheetHeader
+          className={cn(
+            "px-5 pt-4 pb-3 space-y-2 border-b shrink-0",
+            isEpic && "border-l-[3px]"
+          )}
+          style={isEpic ? { borderLeftColor: epicColor! } : undefined}
+        >
           {/* Breadcrumb trail — inline with ticket key */}
           <div className="flex items-center gap-1 text-xxs text-muted-foreground pr-6">
             {ticketHistory.length > 0 && (
@@ -433,6 +452,15 @@ export function TicketDrawer({
             <span className="font-mono font-medium text-foreground/80 shrink-0">
               {ticket.key}
             </span>
+            {isEpic && (
+              <span className="inline-flex items-center gap-1 text-xxs text-muted-foreground ml-1">
+                <span
+                  className="h-1.5 w-1.5 rounded-full shrink-0"
+                  style={{ backgroundColor: epicColor! }}
+                />
+                Epic
+              </span>
+            )}
             {ticket.isL2 && (
               <Badge variant="outline" className="text-xxs text-violet-500 border-violet-300 ml-1">
                 L2
@@ -475,6 +503,148 @@ export function TicketDrawer({
           className="flex-1 min-h-0 overflow-y-auto"
         >
           <div>
+          {isEpic ? (
+            /* ── Epic linear layout — same structure as regular tickets ── */
+            <>
+            {/* Properties table — same as regular tickets, minus the Epic row */}
+            <div className="px-5 py-3 space-y-2.5 border-b text-xs">
+              {/* Status */}
+              <div className="flex items-center">
+                <span className="w-24 text-muted-foreground shrink-0">Status</span>
+                <span
+                  className={cn(
+                    statusBadgeBase,
+                    "text-[10px] px-1.5 py-0.5",
+                    getStatusBadgeColor(ticket.statusCategory)
+                  )}
+                >
+                  {ticket.status.toUpperCase()}
+                </span>
+              </div>
+              {/* Priority */}
+              <div className="flex items-center">
+                <span className="w-24 text-muted-foreground shrink-0">Priority</span>
+                <span className={cn("inline-flex items-center gap-1", priorityClass)}>
+                  <PriorityIcon className="h-3.5 w-3.5" />
+                  {ticket.priority}
+                </span>
+              </div>
+              {/* Assignee */}
+              {assignee && (
+                <div className="flex items-center">
+                  <span className="w-24 text-muted-foreground shrink-0">Assignee</span>
+                  <div className="flex items-center gap-1.5">
+                    <Avatar className="h-4 w-4">
+                      <AvatarImage src={assignee.avatarUrl} alt={assignee.name} />
+                      <AvatarFallback className="text-[7px]">
+                        {getInitials(assignee.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span>{assignee.name}</span>
+                  </div>
+                </div>
+              )}
+              {/* Labels */}
+              {ticket.labels.length > 0 && (
+                <div className="flex items-start">
+                  <span className="w-24 text-muted-foreground shrink-0 pt-0.5">Labels</span>
+                  <div className="flex flex-wrap gap-1">
+                    {ticket.labels.map((label) => (
+                      <Badge key={label} variant="secondary" className="text-xxs">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Children count as a property row */}
+              <div className="flex items-center">
+                <span className="w-24 text-muted-foreground shrink-0">Children</span>
+                <span className="text-muted-foreground">
+                  {epicLoading ? "..." : epicChildren.length}
+                </span>
+              </div>
+            </div>
+
+            {/* Epic Children — progress + grouped list */}
+            <div className="px-5 py-3 border-b space-y-3">
+              <EpicProgressBar tickets={epicChildren} />
+              <EpicChildrenList
+                tickets={epicChildren}
+                loading={epicLoading}
+                onTicketSelect={onTicketSelect}
+              />
+            </div>
+
+            {/* Description */}
+            <div className="px-5 py-3 border-b">
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm [&_h1]:text-sm [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-xs [&_h3]:font-semibold [&_p]:text-xs [&_p]:leading-relaxed [&_li]:text-xs [&_li]:leading-relaxed [&_ul]:my-1 [&_ol]:my-1 [&_p]:my-1.5 [&_h1]:my-2 [&_h2]:my-2 [&_strong]:font-semibold">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+                  {ticket.description || "*No description*"}
+                </ReactMarkdown>
+              </div>
+            </div>
+
+            {/* Comments — identical to regular ticket comments */}
+            <div className="px-5 py-3 space-y-3">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <MessageSquare className="h-3.5 w-3.5" />
+                {ticket.comments.length} comment{ticket.comments.length !== 1 ? "s" : ""}
+              </div>
+
+              {[...ticket.comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((c) => {
+                const author = getMember(c.authorId);
+                return (
+                  <div key={c.id} className="flex gap-2.5">
+                    <Avatar className="h-6 w-6 shrink-0 mt-0.5">
+                      <AvatarImage src={author?.avatarUrl} alt={author?.name} />
+                      <AvatarFallback className="text-[9px]">
+                        {author ? getInitials(author.name) : "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-xs font-medium">
+                          {author?.name ?? "Unknown"}
+                        </span>
+                        <span className="text-xxs text-muted-foreground">
+                          {formatRelativeTime(c.createdAt)}
+                        </span>
+                      </div>
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground leading-relaxed mt-0.5 [&_p]:text-xs [&_p]:leading-relaxed [&_p]:my-1 [&_strong]:font-semibold [&_img]:max-w-full [&_img]:rounded-md [&_img]:border [&_img]:my-1">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+                          {c.body}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <Separator />
+
+              {/* Add Comment */}
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Add a comment or flag a blocker..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="min-h-[64px] resize-none text-xs"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSubmitComment}
+                  disabled={!comment.trim()}
+                  className="h-7 text-xs"
+                >
+                  Add Comment
+                </Button>
+              </div>
+            </div>
+            </>
+          ) : (
+          /* ── Standard ticket layout ── */
+          <>
           {/* Properties table — Notion-style */}
           <div className="px-5 py-3 space-y-2.5 border-b text-xs">
             {/* Status */}
@@ -516,28 +686,43 @@ export function TicketDrawer({
               </div>
             )}
 
-            {/* Epic — clickable to show siblings */}
-            {ticket.epicName && (
+            {/* Epic — clickable to show siblings, with "View Epic" button */}
+            {ticket.epicName && !isEpic && (
               <div className="flex items-center">
                 <span className="w-24 text-muted-foreground shrink-0">Epic</span>
                 <div className="flex-1 min-w-0">
-                  <button
-                    onClick={() => setEpicExpanded(!epicExpanded)}
-                    className="inline-flex items-center gap-1.5 max-w-full hover:text-foreground transition-colors rounded px-1.5 py-0.5 -mx-1.5 hover:bg-surface-hover"
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full shrink-0"
-                      style={{ backgroundColor: ticket.epicColor || "#6B7280" }}
-                    />
-                    <span className="truncate">{ticket.epicName}</span>
-                    <span className="text-muted-foreground/50 text-xxs shrink-0">
-                      ({epicSiblings.length + 1})
-                    </span>
-                    <ChevronRight className={cn(
-                      "h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150",
-                      epicExpanded && "rotate-90"
-                    )} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setEpicExpanded(!epicExpanded)}
+                      className="inline-flex items-center gap-1.5 max-w-full hover:text-foreground transition-colors rounded px-1.5 py-0.5 -mx-1.5 hover:bg-surface-hover"
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: ticket.epicColor || "#6B7280" }}
+                      />
+                      <span className="truncate">{ticket.epicName}</span>
+                      <span className="text-muted-foreground/50 text-xxs shrink-0">
+                        ({epicSiblings.length + 1})
+                      </span>
+                      <ChevronRight className={cn(
+                        "h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150",
+                        epicExpanded && "rotate-90"
+                      )} />
+                    </button>
+                    {ticket.epicKey && (
+                      <button
+                        onClick={() => {
+                          fetchTicket(ticket.epicKey!).then((epicTicket) => {
+                            if (epicTicket) onTicketSelect?.(epicTicket);
+                          });
+                        }}
+                        className="p-0.5 rounded hover:bg-surface-hover transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                        title="View epic details"
+                      >
+                        <ArrowUpRight className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
 
                   {/* Epic children list */}
                   {epicExpanded && epicLoading && (
@@ -874,6 +1059,8 @@ export function TicketDrawer({
               </Button>
             </div>
           </div>
+          </>
+          )}
         </div>
         </div>
       </SheetContent>
