@@ -128,13 +128,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
