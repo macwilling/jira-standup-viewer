@@ -48,6 +48,18 @@ export interface Sprint {
   endDate: string;
 }
 
+export interface ChangelogEntry {
+  id: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  created: string;
+  changes: {
+    field: string;
+    from: string | null;
+    to: string | null;
+  }[];
+}
+
 export interface TeamMemberWithTickets extends TeamMember {
   sprintTickets: Ticket[];
   l2Tickets: Ticket[];

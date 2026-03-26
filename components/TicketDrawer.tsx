@@ -30,7 +30,7 @@ import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Ticket, TicketPriority, TicketStatus, TeamMember } from "@/lib/types";
+import { Ticket, TicketPriority, TicketStatus, TeamMember, ChangelogEntry } from "@/lib/types";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
 import { TicketLink } from "./TicketLink";
@@ -83,6 +83,23 @@ function formatRelativeTime(dateStr: string): string {
   return `${days}d ago`;
 }
 
+function formatChangelogTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  if (isToday) return `Today ${time}`;
+  if (isYesterday) return `Yesterday ${time}`;
+
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${date} ${time}`;
+}
+
 export function TicketDrawer({
   ticket,
   teamMembers,
@@ -104,6 +121,11 @@ export function TicketDrawer({
   const [epicChildren, setEpicChildren] = useState<Ticket[]>([]);
   const [epicLoading, setEpicLoading] = useState(false);
 
+  // Activity changelog state
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [changelog, setChangelog] = useState<ChangelogEntry[]>([]);
+  const [changelogLoading, setChangelogLoading] = useState(false);
+
   // Linked tickets state
   const [fetchedLinks, setFetchedLinks] = useState<
     { type: string; targetKey: string; ticket: Ticket }[]
@@ -122,6 +144,9 @@ export function TicketDrawer({
     setEpicExpanded(false);
     setEpicChildren([]);
     setFetchedLinks([]);
+    setActivityExpanded(false);
+    setChangelog([]);
+    setChangelogLoading(false);
 
     // Fetch epic children
     if (ticket.epicKey) {
@@ -524,21 +549,113 @@ export function TicketDrawer({
               </div>
             )}
 
-            {/* Last Activity */}
+            {/* Last Activity — expandable changelog */}
             <div className="flex items-center">
               <span className="w-24 text-muted-foreground shrink-0">Activity</span>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1",
-                  stale ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground"
-                )}
-              >
-                {stale && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
-                <Clock className="h-3 w-3" />
-                {formatRelativeTime(ticket.lastActivityDate)}
-              </span>
+              <div className="flex-1 min-w-0">
+                <button
+                  onClick={() => {
+                    const next = !activityExpanded;
+                    setActivityExpanded(next);
+                    if (next && changelog.length === 0 && !changelogLoading) {
+                      setChangelogLoading(true);
+                      fetch(`/api/jira/changelog?key=${encodeURIComponent(ticket.key)}`)
+                        .then((r) => r.json())
+                        .then((data) => setChangelog(data.changelog || []))
+                        .catch(() => setChangelog([]))
+                        .finally(() => setChangelogLoading(false));
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors rounded px-1.5 py-0.5 -mx-1.5 hover:bg-surface-hover"
+                >
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1",
+                      stale ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground"
+                    )}
+                  >
+                    {stale && <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />}
+                    <Clock className="h-3 w-3" />
+                    {formatRelativeTime(ticket.lastActivityDate)}
+                  </span>
+                  <ChevronRight className={cn(
+                    "h-3 w-3 text-muted-foreground shrink-0 transition-transform duration-150",
+                    activityExpanded && "rotate-90"
+                  )} />
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Changelog timeline */}
+          {activityExpanded && (
+            <div className="px-5 py-3 border-b">
+              {changelogLoading && (
+                <div className="text-xs text-muted-foreground py-2">Loading activity...</div>
+              )}
+              {!changelogLoading && changelog.length === 0 && (
+                <div className="text-xs text-muted-foreground py-2">No recent activity</div>
+              )}
+              {!changelogLoading && changelog.length > 0 && (
+                <div className="relative">
+                  {changelog.map((entry, entryIdx) => (
+                    <div key={entry.id} className="relative flex gap-3">
+                      {/* Timeline rail */}
+                      <div className="flex flex-col items-center shrink-0 w-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-border mt-[7px] shrink-0 ring-2 ring-background" />
+                        {entryIdx < changelog.length - 1 && (
+                          <div className="w-px flex-1 bg-border/60" />
+                        )}
+                      </div>
+
+                      {/* Entry content */}
+                      <div className="pb-4 min-w-0 flex-1">
+                        {/* Author + timestamp row */}
+                        <div className="flex items-center gap-1.5 text-xs leading-tight">
+                          <span className="font-medium text-foreground truncate">{entry.authorName}</span>
+                          <span className="text-muted-foreground/60 shrink-0">&middot;</span>
+                          <span className="text-muted-foreground text-xxs shrink-0 tabular-nums">
+                            {formatChangelogTimestamp(entry.created)}
+                          </span>
+                        </div>
+
+                        {/* Changes */}
+                        <div className="mt-1 space-y-0.5">
+                          {entry.changes.map((change, i) => (
+                            <div key={i} className="text-xs text-muted-foreground leading-relaxed">
+                              <span className="text-foreground/60">{change.field}:</span>{" "}
+                              {change.field === "Status" ? (
+                                <span className="inline-flex items-center gap-1 align-middle">
+                                  {change.from && (
+                                    <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
+                                      {change.from}
+                                    </span>
+                                  )}
+                                  <span className="text-muted-foreground/40">&rarr;</span>
+                                  {change.to && (
+                                    <span className={cn(statusBadgeBase, "text-[8px] px-1 py-px")}>
+                                      {change.to}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span>
+                                  {change.from && <span className="line-through text-muted-foreground/50">{change.from}</span>}
+                                  {change.from && change.to && <span className="text-muted-foreground/40"> &rarr; </span>}
+                                  {change.to && <span>{change.to}</span>}
+                                  {!change.from && !change.to && <span className="italic">cleared</span>}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Linked Tickets */}
           {(resolvedLinks.length > 0 || linksLoading) && (

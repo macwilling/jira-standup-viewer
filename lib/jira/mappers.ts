@@ -7,8 +7,9 @@ import {
   TicketLinkDef,
   LinkType,
   Sprint,
+  ChangelogEntry,
 } from "@/lib/types";
-import { JiraIssue, JiraIssueLink, JiraAdfNode, JiraComment, JiraSprint } from "./types";
+import { JiraIssue, JiraIssueLink, JiraAdfNode, JiraComment, JiraSprint, JiraChangelogHistory } from "./types";
 
 // --- Status mapping ---
 // We pass through the real Jira status name and use statusCategory for color coding
@@ -306,6 +307,74 @@ const EPIC_COLORS: Record<string, string> = {
   "dark_red": "#B91C1C",
   "dark_pink": "#BE185D",
 };
+
+// --- Changelog mapping ---
+
+const CHANGELOG_NOISE_FIELDS = new Set([
+  "Rank",
+  "RemoteIssueLink",
+  "Workflow",
+  "timespent",
+  "timeestimate",
+  "timeoriginalestimate",
+  "WorklogId",
+  "aggregatetimespent",
+  "aggregatetimeestimate",
+  "aggregatetimeoriginalestimate",
+  "aggregateprogress",
+  "progress",
+]);
+
+const FIELD_DISPLAY_NAMES: Record<string, string> = {
+  status: "Status",
+  assignee: "Assignee",
+  priority: "Priority",
+  summary: "Summary",
+  description: "Description",
+  labels: "Labels",
+  resolution: "Resolution",
+  issuetype: "Type",
+  "Fix Version": "Fix Version",
+  "Component": "Component",
+  "Story Points": "Story Points",
+  "customfield_10014": "Epic Link",
+  "Sprint": "Sprint",
+  "Link": "Link",
+};
+
+function prettifyFieldName(field: string): string {
+  if (FIELD_DISPLAY_NAMES[field]) return FIELD_DISPLAY_NAMES[field];
+  // Strip "customfield_" prefix and capitalize
+  if (field.startsWith("customfield_")) return field;
+  return field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
+}
+
+export function mapChangelog(histories: JiraChangelogHistory[]): ChangelogEntry[] {
+  const entries: ChangelogEntry[] = [];
+
+  for (const history of histories) {
+    const filteredItems = history.items.filter(
+      (item) => !CHANGELOG_NOISE_FIELDS.has(item.field)
+    );
+    if (filteredItems.length === 0) continue;
+
+    entries.push({
+      id: history.id,
+      authorName: history.author.displayName,
+      authorAvatarUrl: history.author.avatarUrls["24x24"],
+      created: history.created,
+      changes: filteredItems.map((item) => ({
+        field: prettifyFieldName(item.field),
+        from: item.fromString,
+        to: item.toString,
+      })),
+    });
+  }
+
+  // Sort newest first and limit
+  entries.sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
+  return entries.slice(0, 20);
+}
 
 // --- Full issue mapping ---
 

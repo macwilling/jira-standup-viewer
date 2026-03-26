@@ -130,3 +130,28 @@ export interface JiraSearchResponse {
   maxResults?: number;
   total?: number;
 }
+
+// --- Changelog types ---
+
+export interface JiraChangelogItem {
+  field: string;
+  fieldtype: string;
+  fieldId: string;
+  fromString: string | null;
+  toString: string | null;
+}
+
+export interface JiraChangelogHistory {
+  id: string;
+  author: JiraUser;
+  created: string;
+  items: JiraChangelogItem[];
+}
+
+export interface JiraChangelogResponse {
+  values: JiraChangelogHistory[];
+  maxResults: number;
+  startAt: number;
+  total: number;
+  isLast: boolean;
+}

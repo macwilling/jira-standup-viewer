@@ -1,4 +1,4 @@
-import { JiraSearchResponse, JiraSprint } from "./types";
+import { JiraSearchResponse, JiraSprint, JiraChangelogResponse } from "./types";
 
 const BASE_FIELDS = [
   "summary",
@@ -196,6 +196,13 @@ export async function fetchActiveSprint(boardId: string): Promise<JiraSprint | n
     // The Agile API may not be available on all Jira instances
     return null;
   }
+}
+
+/** Fetch changelog for a single issue. Returns raw Jira changelog response. */
+export async function fetchChangelog(issueKey: string): Promise<JiraChangelogResponse> {
+  return jiraFetch<JiraChangelogResponse>(
+    `/rest/api/3/issue/${issueKey}/changelog`
+  );
 }
 
 export async function testConnection(): Promise<{
