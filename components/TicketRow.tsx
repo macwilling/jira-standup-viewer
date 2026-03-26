@@ -58,7 +58,7 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
         const color = getEpicColor(ticket.epicName, ticket.epicColor);
         return (
           <span
-            className="shrink-0 max-w-[100px] truncate rounded px-1.5 py-px text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-70 transition-opacity duration-150"
+            className="shrink-0 max-w-[100px] truncate rounded px-1.5 py-px text-[10px] font-medium leading-tight opacity-0 group-hover:opacity-70 transition-opacity duration-150 dark:brightness-[1.6] dark:saturate-[0.8]"
             style={{
               backgroundColor: color + "20",
               color: color,
