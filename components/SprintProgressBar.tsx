@@ -65,9 +65,9 @@ export function SprintProgressBar({
 
       {/* Summary */}
       <span className="text-xxs text-muted-foreground shrink-0">
-        <span className="font-medium text-foreground">{done}</span>/{total} done
-        {" · "}
         <span className="font-medium text-foreground">{inProgress}</span> in progress
+        {" · "}
+        <span className="font-medium text-foreground">{done}</span>/{total} done
       </span>
     </div>
   );
