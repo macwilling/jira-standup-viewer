@@ -8,6 +8,7 @@ import { TeamCard } from "@/components/TeamCard";
 import { TicketDrawer } from "@/components/TicketDrawer";
 import { SearchBar } from "@/components/SearchBar";
 import { SetupBanner } from "@/components/SetupBanner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketStatus, TeamMemberWithTickets } from "@/lib/types";
 
@@ -176,6 +177,7 @@ export default function Home() {
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
               </button>
+              <ThemeToggle />
               <Link
                 href="/settings"
                 className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
