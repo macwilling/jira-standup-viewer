@@ -640,9 +640,9 @@ export function TicketDrawer({
                                 </span>
                               ) : (
                                 <span>
-                                  {change.from && <span className="line-through text-muted-foreground/50">{change.from}</span>}
+                                  {change.from && <span className="line-through text-muted-foreground/50"><TicketLink text={change.from} onTicketClick={onTicketSelect} /></span>}
                                   {change.from && change.to && <span className="text-muted-foreground/40"> &rarr; </span>}
-                                  {change.to && <span>{change.to}</span>}
+                                  {change.to && <span><TicketLink text={change.to} onTicketClick={onTicketSelect} /></span>}
                                   {!change.from && !change.to && <span className="italic">cleared</span>}
                                 </span>
                               )}
