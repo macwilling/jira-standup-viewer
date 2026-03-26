@@ -825,7 +825,7 @@ export function TicketDrawer({
               {ticket.comments.length} comment{ticket.comments.length !== 1 ? "s" : ""}
             </div>
 
-            {ticket.comments.map((c) => {
+            {[...ticket.comments].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((c) => {
               const author = getMember(c.authorId);
               return (
                 <div key={c.id} className="flex gap-2.5">
