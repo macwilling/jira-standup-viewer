@@ -8,6 +8,7 @@ import { TeamCard } from "@/components/TeamCard";
 import { TicketDrawer } from "@/components/TicketDrawer";
 import { SearchBar } from "@/components/SearchBar";
 import { SetupBanner } from "@/components/SetupBanner";
+import { SprintProgressBar } from "@/components/SprintProgressBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketStatus, TeamMemberWithTickets } from "@/lib/types";
@@ -136,7 +137,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Compact header */}
+      {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-between h-11 px-4">
           <h1 className="text-sm font-semibold tracking-tight shrink-0">
@@ -154,45 +155,30 @@ export default function Home() {
             </kbd>
           </button>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="text-right">
-              {sprint ? (
-                <>
-                  <p className="text-xs font-medium">{sprint.name}</p>
-                  <p className="text-xxs text-muted-foreground">
-                    {formatDate(sprint.startDate)} – {formatDate(sprint.endDate)}
-                  </p>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground">No active sprint</p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1 ml-2 border-l pl-2">
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
-                title="Refresh tickets"
-              >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              </button>
-              <ThemeToggle />
-              <Link
-                href="/settings"
-                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                title="Settings"
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                title="Logout"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-              </button>
-            </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+              title="Refresh tickets"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            <ThemeToggle />
+            <Link
+              href="/settings"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Settings"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </header>
@@ -243,6 +229,18 @@ export default function Home() {
           tickets={tickets}
           onSelect={handleTicketSelect}
         />
+      )}
+
+      {/* Sprint progress footer */}
+      {tickets.length > 0 && (
+        <footer className="sticky bottom-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+          <div className="max-w-5xl mx-auto">
+            <SprintProgressBar
+              sprintTickets={tickets.filter((t) => !t.isL2)}
+              sprint={sprint}
+            />
+          </div>
+        </footer>
       )}
 
       <TicketDrawer
