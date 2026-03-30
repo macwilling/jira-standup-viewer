@@ -12,6 +12,65 @@ export function isStale(ticket: Ticket): boolean {
   return Date.now() - new Date(ticket.lastActivityDate).getTime() > STALE_THRESHOLD_MS;
 }
 
+/** Returns true if the ticket was updated on or after the given date */
+export function isRecentlyChanged(ticket: Ticket, since: Date): boolean {
+  return new Date(ticket.lastActivityDate).getTime() >= since.getTime();
+}
+
+/**
+ * Returns the most recent standup time in the past.
+ * If today's standup hasn't happened yet, returns yesterday's standup time.
+ * @param time HH:MM in 24h format (default "09:00")
+ * @param timezone IANA timezone (default: browser local)
+ */
+export function getLastStandupTime(
+  time?: string | null,
+  timezone?: string | null,
+): Date {
+  const [hours, minutes] = (time || "09:00").split(":").map(Number);
+
+  // Build "today at standup time" in the configured timezone
+  const now = new Date();
+
+  if (timezone) {
+    // Use Intl to get the current wall-clock time in the target timezone
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(now);
+
+    const get = (type: string) =>
+      Number(parts.find((p) => p.type === type)?.value ?? 0);
+
+    const tzNowMinutes = get("hour") * 60 + get("minute");
+    const standupMinutes = hours * 60 + minutes;
+
+    // How many ms ago was standup in this timezone?
+    // If standup hasn't happened yet today, go back to yesterday's
+    const diffMinutes = tzNowMinutes - standupMinutes;
+    const msAgo =
+      diffMinutes >= 0
+        ? diffMinutes * 60_000
+        : (diffMinutes + 24 * 60) * 60_000;
+
+    return new Date(now.getTime() - msAgo);
+  }
+
+  // No timezone configured — use browser local time
+  const d = new Date(now);
+  d.setHours(hours, minutes, 0, 0);
+  if (d.getTime() > now.getTime()) {
+    // Standup hasn't happened yet today — use yesterday
+    d.setDate(d.getDate() - 1);
+  }
+  return d;
+}
+
 /** Jira-style status lozenge colors based on Jira's statusCategory */
 const categoryColors: Record<StatusCategory, string> = {
   "new": "bg-slate-200 text-slate-700 dark:bg-slate-600/30 dark:text-slate-300",

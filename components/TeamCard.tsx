@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TicketRow } from "./TicketRow";
+import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TeamMemberWithTickets } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +33,9 @@ export function TeamCard({
   onToggle,
   onTicketSelect,
 }: TeamCardProps) {
+  const { isRecent } = useTicketData();
   const totalTickets = member.sprintTickets.length + member.l2Tickets.length;
+  const recentCount = [...member.sprintTickets, ...member.l2Tickets].filter(isRecent).length;
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
@@ -60,6 +63,9 @@ export function TeamCard({
             <span>{totalTickets}</span>
             {member.l2Tickets.length > 0 && (
               <span className="text-violet-400/60">{member.l2Tickets.length} L2</span>
+            )}
+            {recentCount > 0 && (
+              <span className="text-blue-400/60">{recentCount} updated</span>
             )}
             {member.staleCount > 0 && (
               <span className="text-amber-500/60">{member.staleCount} stale</span>

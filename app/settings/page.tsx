@@ -17,6 +17,8 @@ interface ConfigStatus {
     l2LabelPatterns: string[];
     sprintFieldId?: string;
     boardId?: string;
+    standupTime?: string;
+    standupTimezone?: string;
   } | null;
 }
 
@@ -32,6 +34,8 @@ export default function SettingsPage() {
   const [l2Labels, setL2Labels] = useState("");
   const [sprintFieldId, setSprintFieldId] = useState("");
   const [boardId, setBoardId] = useState("");
+  const [standupTime, setStandupTime] = useState("09:00");
+  const [standupTimezone, setStandupTimezone] = useState("");
 
   // Load current config
   useEffect(() => {
@@ -44,6 +48,8 @@ export default function SettingsPage() {
           setL2Labels(data.config.l2LabelPatterns.join(", "));
           setSprintFieldId(data.config.sprintFieldId || "");
           setBoardId(data.config.boardId || "");
+          setStandupTime(data.config.standupTime || "09:00");
+          setStandupTimezone(data.config.standupTimezone || "");
         }
       })
       .catch(() => {})
@@ -65,6 +71,8 @@ export default function SettingsPage() {
             .filter(Boolean),
           ...(sprintFieldId.trim() ? { sprintFieldId: sprintFieldId.trim() } : {}),
           ...(boardId.trim() ? { boardId: boardId.trim() } : {}),
+          ...(standupTime ? { standupTime } : {}),
+          ...(standupTimezone.trim() ? { standupTimezone: standupTimezone.trim() } : {}),
         }),
       });
       if (res.ok) setSaved(true);
@@ -149,6 +157,43 @@ export default function SettingsPage() {
                 </span>
               </div>
             )}
+          </div>
+        </section>
+
+        {/* Standup Settings */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Standup
+          </h2>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="standupTime" className="text-xs">Standup Time</Label>
+                <Input
+                  id="standupTime"
+                  type="time"
+                  value={standupTime}
+                  onChange={(e) => setStandupTime(e.target.value)}
+                  className="text-xs font-mono"
+                />
+                <p className="text-xxs text-muted-foreground">
+                  &quot;Updated since last standup&quot; uses this as the daily cutoff.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="standupTz" className="text-xs">Timezone</Label>
+                <Input
+                  id="standupTz"
+                  value={standupTimezone}
+                  onChange={(e) => setStandupTimezone(e.target.value)}
+                  placeholder={Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  className="text-xs font-mono"
+                />
+                <p className="text-xxs text-muted-foreground">
+                  IANA timezone (e.g. <code className="bg-muted px-1 rounded">America/New_York</code>). Defaults to your browser timezone.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

@@ -3,6 +3,8 @@ export interface DashboardConfig {
   l2LabelPatterns: string[];
   sprintFieldId?: string; // Custom field ID for sprint (defaults to "customfield_10020")
   boardId?: string; // Jira Agile board ID — used as fallback to fetch active sprint
+  standupTime?: string; // HH:MM in 24h format, e.g. "09:45". Defaults to "09:00"
+  standupTimezone?: string; // IANA timezone, e.g. "America/New_York". Defaults to browser local
 }
 
 const CONFIG_KEY = "dashboard-config";

@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
       l2LabelPatterns: body.l2LabelPatterns || [],
       ...(body.sprintFieldId ? { sprintFieldId: body.sprintFieldId } : {}),
       ...(body.boardId ? { boardId: body.boardId } : {}),
+      ...(body.standupTime ? { standupTime: body.standupTime } : {}),
+      ...(body.standupTimezone ? { standupTimezone: body.standupTimezone } : {}),
     });
 
     return NextResponse.json({ ok: true });

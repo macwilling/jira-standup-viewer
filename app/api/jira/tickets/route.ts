@@ -106,7 +106,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ tickets, teamMembers, sprint, configured: true });
+    return NextResponse.json({
+      tickets,
+      teamMembers,
+      sprint,
+      configured: true,
+      standupTime: config.standupTime || null,
+      standupTimezone: config.standupTimezone || null,
+    });
   } catch (e) {
     return NextResponse.json(
       { error: (e as Error).message, configured: true },

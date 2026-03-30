@@ -28,10 +28,11 @@ interface TicketRowProps {
 }
 
 export function TicketRow({ ticket, onSelect }: TicketRowProps) {
-  const { isStale } = useTicketData();
+  const { isStale, isRecent } = useTicketData();
   const { icon: PriorityIcon, className: priorityClass } =
     priorityConfig[ticket.priority];
   const stale = isStale(ticket);
+  const recent = isRecent(ticket);
   const { tags, rest } = parseSummaryTags(ticket.summary);
 
   return (
@@ -39,8 +40,11 @@ export function TicketRow({ ticket, onSelect }: TicketRowProps) {
       onClick={() => onSelect(ticket)}
       className="w-full flex items-center gap-2 px-2 pr-4 py-1 h-8 rounded-sm text-left transition-colors hover:bg-surface-hover group"
     >
-      <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px]">
+      <span className="font-mono text-xxs text-muted-foreground shrink-0 w-[72px] inline-flex items-center gap-1">
         {ticket.key}
+        {recent && (
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" title="Updated since yesterday" />
+        )}
       </span>
       <span className="text-sm truncate flex-1">
         {tags.map((tag, i) => (

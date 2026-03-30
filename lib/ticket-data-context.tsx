@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { Ticket, TeamMember, Sprint } from "./types";
-import { isStale as isStaleUtil } from "./utils";
+import { isStale as isStaleUtil, isRecentlyChanged, getLastStandupTime } from "./utils";
 import {
   teamMembers as mockTeamMembers,
   tickets as mockTickets,
@@ -20,6 +20,9 @@ interface TicketDataContextValue {
   findTicket: (key: string) => Ticket | undefined;
   fetchTicket: (key: string) => Promise<Ticket | undefined>;
   isStale: (ticket: Ticket) => boolean;
+  isRecent: (ticket: Ticket) => boolean;
+  standupTime: string | null;
+  standupTimezone: string | null;
   refresh: () => void;
 }
 
@@ -33,6 +36,9 @@ const TicketDataContext = createContext<TicketDataContextValue>({
   findTicket: () => undefined,
   fetchTicket: async () => undefined,
   isStale: isStaleUtil,
+  isRecent: () => false,
+  standupTime: null,
+  standupTimezone: null,
   refresh: () => {},
 });
 
@@ -120,6 +126,18 @@ export function TicketDataProvider({ children }: { children: React.ReactNode }) 
     [ticketMap, externalCache]
   );
 
+  const standupTime: string | null = data?.standupTime || null;
+  const standupTimezone: string | null = data?.standupTimezone || null;
+
+  const recentSince = useMemo(
+    () => getLastStandupTime(standupTime, standupTimezone),
+    [standupTime, standupTimezone]
+  );
+  const isRecent = useCallback(
+    (ticket: Ticket) => isRecentlyChanged(ticket, recentSince),
+    [recentSince]
+  );
+
   const value = useMemo<TicketDataContextValue>(
     () => ({
       tickets,
@@ -131,9 +149,12 @@ export function TicketDataProvider({ children }: { children: React.ReactNode }) 
       findTicket,
       fetchTicket,
       isStale: isStaleUtil,
+      isRecent,
+      standupTime,
+      standupTimezone,
       refresh: () => mutate(),
     }),
-    [tickets, teamMembers, sprint, isLoading, error, configured, findTicket, fetchTicket, mutate]
+    [tickets, teamMembers, sprint, isLoading, error, configured, findTicket, fetchTicket, isRecent, mutate]
   );
 
   return (

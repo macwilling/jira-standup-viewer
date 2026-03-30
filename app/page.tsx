@@ -10,8 +10,13 @@ import { SearchBar } from "@/components/SearchBar";
 import { SetupBanner } from "@/components/SetupBanner";
 import { SprintProgressBar } from "@/components/SprintProgressBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ViewTabs, ViewMode } from "@/components/standup/ViewTabs";
+import { ChangesView } from "@/components/standup/ChangesView";
+import { RisksView } from "@/components/standup/RisksView";
 import { useTicketData } from "@/lib/ticket-data-context";
 import { Ticket, TicketStatus, TeamMemberWithTickets } from "@/lib/types";
+import { detectChanges, getWindowStart } from "@/lib/standup-changes-utils";
+import { buildRisksList } from "@/lib/risks-utils";
 
 export default function Home() {
   const {
@@ -22,6 +27,8 @@ export default function Home() {
     error,
     configured,
     isStale,
+    standupTime,
+    standupTimezone,
     refresh,
   } = useTicketData();
 
@@ -42,11 +49,23 @@ export default function Home() {
     Promise.all([minSpin, fetched]).finally(() => setRefreshing(false));
   }, [refreshing, refresh]);
 
+  const [viewMode, setViewMode] = useState<ViewMode>("team");
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [ticketHistory, setTicketHistory] = useState<Ticket[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [expandedMembers, setExpandedMembers] = useState<Set<string>>(
     new Set()
+  );
+
+  // Counts for tab badges
+  const changesCount = useMemo(() => {
+    const since = getWindowStart("since-standup", standupTime, standupTimezone);
+    return detectChanges(tickets, teamMembers, since).length;
+  }, [tickets, teamMembers, standupTime, standupTimezone]);
+
+  const risksCount = useMemo(
+    () => buildRisksList(tickets, teamMembers, isStale).length,
+    [tickets, teamMembers, isStale]
   );
 
   const membersWithTickets: TeamMemberWithTickets[] = useMemo(() => {
@@ -205,21 +224,55 @@ export default function Home() {
         </div>
       )}
 
-      {/* Main content */}
+      {/* View tabs + Main content */}
       {tickets.length > 0 && (
-        <main className="flex-1 px-4 py-3">
-          <div className="flex flex-col max-w-5xl mx-auto">
-            {membersWithTickets.map((member) => (
-              <TeamCard
-                key={member.id}
-                member={member}
-                isExpanded={expandedMembers.has(member.id)}
-                onToggle={() => toggleMember(member.id)}
+        <>
+          <div className="px-4 pt-2 pb-1">
+            <div className="max-w-5xl mx-auto">
+              <ViewTabs
+                active={viewMode}
+                onChange={setViewMode}
+                changesCount={changesCount}
+                risksCount={risksCount}
+              />
+            </div>
+          </div>
+
+          <main className="flex-1 px-4 py-1">
+            {viewMode === "team" && (
+              <div className="flex flex-col max-w-5xl mx-auto">
+                {membersWithTickets.map((member) => (
+                  <TeamCard
+                    key={member.id}
+                    member={member}
+                    isExpanded={expandedMembers.has(member.id)}
+                    onToggle={() => toggleMember(member.id)}
+                    onTicketSelect={handleTicketSelect}
+                  />
+                ))}
+              </div>
+            )}
+
+            {viewMode === "changes" && (
+              <ChangesView
+                tickets={tickets}
+                teamMembers={teamMembers}
+                standupTime={standupTime}
+                standupTimezone={standupTimezone}
                 onTicketSelect={handleTicketSelect}
               />
-            ))}
-          </div>
-        </main>
+            )}
+
+            {viewMode === "risks" && (
+              <RisksView
+                tickets={tickets}
+                teamMembers={teamMembers}
+                isStale={isStale}
+                onTicketSelect={handleTicketSelect}
+              />
+            )}
+          </main>
+        </>
       )}
 
       {searchOpen && (
