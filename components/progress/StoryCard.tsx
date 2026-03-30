@@ -1,13 +1,15 @@
 "use client";
 
-import { StoryCard as StoryCardType } from "@/lib/progress-utils";
+import { Ban, ChevronRight } from "lucide-react";
+import { StoryCard as StoryCardType, TaskChip } from "@/lib/progress-utils";
 import { Ticket } from "@/lib/types";
 import { MiniProgressBar } from "./MiniProgressBar";
-import { TaskChipBadge } from "./TaskChipBadge";
 import { cn, getStatusBadgeColor, statusBadgeBase, parseSummaryTags } from "@/lib/utils";
 
 interface StoryCardProps {
   card: StoryCardType;
+  expanded: boolean;
+  onToggle: () => void;
   onTicketSelect: (ticket: Ticket) => void;
   onTaskChipClick: (key: string) => void;
 }
@@ -20,7 +22,45 @@ function getBorderColor(card: StoryCardType): string {
   return "border-l-slate-300 dark:border-l-slate-600";
 }
 
-export function StoryCard({ card, onTicketSelect, onTaskChipClick }: StoryCardProps) {
+function TaskRow({ chip, onClick }: { chip: TaskChip; onClick: () => void }) {
+  const isBlocked = chip.blockedBy.length > 0;
+  const { tags, rest } = parseSummaryTags(chip.summary);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 py-1 px-1 rounded-sm text-left text-xs hover:bg-muted/50 transition-colors"
+    >
+      {isBlocked && <Ban className="h-3 w-3 text-red-500 shrink-0" />}
+      <span className={cn("font-mono text-xxs text-muted-foreground shrink-0", !chip.isInSprint && "opacity-50")}>
+        {chip.key}
+      </span>
+      <span className={cn("truncate flex-1 text-xxs", !chip.isInSprint && "opacity-50")}>
+        {tags.map((tag, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center rounded px-1 py-px mr-1 text-[10px] font-medium bg-accent text-accent-foreground/70"
+          >
+            {tag}
+          </span>
+        ))}
+        {rest}
+      </span>
+      <span
+        className={cn(
+          statusBadgeBase,
+          "text-[8px] px-1 py-px shrink-0",
+          getStatusBadgeColor(chip.statusCategory),
+          !chip.isInSprint && "opacity-50"
+        )}
+      >
+        {chip.status.toUpperCase()}
+      </span>
+    </button>
+  );
+}
+
+export function StoryCard({ card, expanded, onToggle, onTicketSelect, onTaskChipClick }: StoryCardProps) {
   const { ticket, tasks, progress, blockedBy, fixVersions, isStub } = card;
   const { tags, rest } = parseSummaryTags(ticket.summary);
 
@@ -33,6 +73,17 @@ export function StoryCard({ card, onTicketSelect, onTaskChipClick }: StoryCardPr
     >
       {/* Row 1: Story key, summary, status, progress */}
       <div className="flex items-center gap-2">
+        {tasks.length > 0 ? (
+          <button
+            onClick={onToggle}
+            className="shrink-0 p-0.5 -ml-1 rounded hover:bg-muted transition-colors"
+            aria-label={expanded ? "Collapse tasks" : "Expand tasks"}
+          >
+            <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", expanded && "rotate-90")} />
+          </button>
+        ) : (
+          <span className="w-4 shrink-0" />
+        )}
         <button
           onClick={() => onTicketSelect(ticket)}
           className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline shrink-0"
@@ -66,11 +117,11 @@ export function StoryCard({ card, onTicketSelect, onTaskChipClick }: StoryCardPr
         )}
       </div>
 
-      {/* Row 2: Task chips */}
-      {tasks.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+      {/* Row 2: Task list (expanded) */}
+      {expanded && tasks.length > 0 && (
+        <div className="border-t pt-1.5 space-y-0.5 ml-4">
           {tasks.map((chip) => (
-            <TaskChipBadge
+            <TaskRow
               key={chip.key}
               chip={chip}
               onClick={() => onTaskChipClick(chip.key)}

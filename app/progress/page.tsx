@@ -2,13 +2,13 @@
 
 import { useState, useMemo, useCallback } from "react";
 import useSWR from "swr";
-import { ArrowLeft, Search, Loader2, Settings, LogOut, RefreshCw } from "lucide-react";
+import { ArrowLeft, Search, Loader2, Settings, LogOut, RefreshCw, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TicketDrawer } from "@/components/TicketDrawer";
 import { SearchBar } from "@/components/SearchBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { FilterBar, ScopeFilter } from "@/components/progress/FilterBar";
+import { FilterBar, ScopeFilter, GroupByOption } from "@/components/progress/FilterBar";
 import { StoryCard } from "@/components/progress/StoryCard";
 import { TaskChipBadge } from "@/components/progress/TaskChipBadge";
 import { useTicketData } from "@/lib/ticket-data-context";
@@ -37,8 +37,10 @@ export default function ProgressPage() {
 
   // --- Filter state ---
   const [scope, setScope] = useState<ScopeFilter>("sprint");
+  const [groupBy, setGroupBy] = useState<GroupByOption>("none");
   const [selectedFixVersions, setSelectedFixVersions] = useState<Set<string>>(new Set());
   const [selectedEpics, setSelectedEpics] = useState<Set<string>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   // --- Data fetching ---
   const { data: allOpenData, error: allOpenError, isLoading: allOpenLoading, mutate: allOpenMutate } = useSWR(
@@ -105,27 +107,73 @@ export default function ProgressPage() {
     [filteredTickets]
   );
 
-  // --- Group stories by epic for display ---
-  const epicGroups = useMemo(() => {
-    const groups: { epicName: string; epicColor: string | null; stories: typeof progressData.stories }[] = [];
+  // --- Group stories for display ---
+  const storyGroups = useMemo(() => {
+    type StoryGroup = { label: string; color: string | null; stories: typeof progressData.stories };
+
+    if (groupBy === "none") {
+      return [{ label: "", color: null, stories: progressData.stories }] as StoryGroup[];
+    }
+
     const map = new Map<string, typeof progressData.stories>();
 
     for (const story of progressData.stories) {
-      const name = story.epicName || "No Epic";
-      if (!map.has(name)) map.set(name, []);
-      map.get(name)!.push(story);
+      let keys: string[];
+      switch (groupBy) {
+        case "epic":
+          keys = [story.epicName || "No Epic"];
+          break;
+        case "fix-version":
+          keys = story.fixVersions.length > 0 ? story.fixVersions : ["No Fix Version"];
+          break;
+        case "assignee": {
+          const member = teamMembers.find((m) => m.id === story.ticket.assigneeId);
+          keys = [member?.name || "Unassigned"];
+          break;
+        }
+        default:
+          keys = [""];
+      }
+      for (const key of keys) {
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(story);
+      }
     }
 
-    for (const [name, stories] of map) {
-      groups.push({
-        epicName: name,
-        epicColor: stories[0]?.epicColor || null,
-        stories,
-      });
+    const groups: StoryGroup[] = [];
+    for (const [label, stories] of map) {
+      let color: string | null = null;
+      if (groupBy === "epic") {
+        color = stories[0]?.epicColor || null;
+      }
+      groups.push({ label, color, stories });
     }
-
     return groups;
-  }, [progressData.stories]);
+  }, [progressData.stories, groupBy, teamMembers]);
+
+  // --- Expand / collapse ---
+  const toggleCard = useCallback((key: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const hasExpandableCards = progressData.stories.some((s) => s.tasks.length > 0);
+  const allCardsExpanded = hasExpandableCards && progressData.stories
+    .filter((s) => s.tasks.length > 0)
+    .every((s) => expandedCards.has(s.ticket.key));
+
+  const toggleExpandAll = useCallback(() => {
+    if (allCardsExpanded) {
+      setExpandedCards(new Set());
+    } else {
+      const allKeys = new Set(progressData.stories.filter((s) => s.tasks.length > 0).map((s) => s.ticket.key));
+      setExpandedCards(allKeys);
+    }
+  }, [allCardsExpanded, progressData.stories]);
 
   // --- Ticket drawer state ---
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -236,10 +284,12 @@ export default function ProgressPage() {
 
       {/* Filter bar */}
       <div className="border-b bg-background px-4 py-2">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto flex items-center gap-2">
           <FilterBar
             scope={scope}
             onScopeChange={setScope}
+            groupBy={groupBy}
+            onGroupByChange={setGroupBy}
             fixVersionOptions={fixVersionOptions}
             selectedFixVersions={selectedFixVersions}
             onFixVersionsChange={setSelectedFixVersions}
@@ -247,6 +297,18 @@ export default function ProgressPage() {
             selectedEpics={selectedEpics}
             onEpicsChange={setSelectedEpics}
           />
+          <button
+            onClick={toggleExpandAll}
+            className="ml-auto inline-flex items-center gap-1 px-2 py-1 h-7 rounded-md text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+            title={allCardsExpanded ? "Collapse all" : "Expand all"}
+          >
+            {allCardsExpanded ? (
+              <ChevronsDownUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">{allCardsExpanded ? "Collapse all" : "Expand all"}</span>
+          </button>
         </div>
       </div>
 
@@ -273,27 +335,33 @@ export default function ProgressPage() {
       {(progressData.stories.length > 0 || progressData.orphanTasks.length > 0) && (
         <main className="flex-1 px-4 py-4">
           <div className="flex flex-col gap-2 max-w-5xl mx-auto">
-            {epicGroups.map((group) => (
-              <div key={group.epicName}>
-                {/* Epic group header */}
-                <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full shrink-0"
-                    style={{ backgroundColor: getEpicColor(group.epicName, group.epicColor) }}
-                  />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {group.epicName}
-                  </span>
-                  <span className="text-xxs text-muted-foreground">
-                    {group.stories.length} {group.stories.length === 1 ? "story" : "stories"}
-                  </span>
-                </div>
+            {storyGroups.map((group) => (
+              <div key={group.label}>
+                {/* Group header (hidden when groupBy=none) */}
+                {group.label && (
+                  <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
+                    {groupBy === "epic" && (
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: getEpicColor(group.label, group.color) }}
+                      />
+                    )}
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {group.label}
+                    </span>
+                    <span className="text-xxs text-muted-foreground">
+                      {group.stories.length} {group.stories.length === 1 ? "story" : "stories"}
+                    </span>
+                  </div>
+                )}
                 {/* Story cards */}
                 <div className="flex flex-col gap-2">
                   {group.stories.map((card) => (
                     <StoryCard
                       key={card.ticket.key}
                       card={card}
+                      expanded={expandedCards.has(card.ticket.key)}
+                      onToggle={() => toggleCard(card.ticket.key)}
                       onTicketSelect={handleTicketSelect}
                       onTaskChipClick={handleTaskChipClick}
                     />

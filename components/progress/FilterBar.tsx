@@ -13,10 +13,13 @@ import {
 import { cn } from "@/lib/utils";
 
 export type ScopeFilter = "sprint" | "all-open";
+export type GroupByOption = "epic" | "fix-version" | "assignee" | "none";
 
 interface FilterBarProps {
   scope: ScopeFilter;
   onScopeChange: (scope: ScopeFilter) => void;
+  groupBy: GroupByOption;
+  onGroupByChange: (groupBy: GroupByOption) => void;
   fixVersionOptions: string[];
   selectedFixVersions: Set<string>;
   onFixVersionsChange: (versions: Set<string>) => void;
@@ -25,9 +28,18 @@ interface FilterBarProps {
   onEpicsChange: (epics: Set<string>) => void;
 }
 
+const groupByLabels: Record<GroupByOption, string> = {
+  epic: "Epic",
+  "fix-version": "Fix Version",
+  assignee: "Assignee",
+  none: "None",
+};
+
 export function FilterBar({
   scope,
   onScopeChange,
+  groupBy,
+  onGroupByChange,
   fixVersionOptions,
   selectedFixVersions,
   onFixVersionsChange,
@@ -69,6 +81,31 @@ export function FilterBar({
           All Open
         </button>
       </div>
+
+      {/* Group by */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className="inline-flex items-center gap-1 px-2.5 py-1 h-7 rounded-md border text-xs text-muted-foreground transition-colors hover:bg-muted"
+        >
+          Group: {groupByLabels[groupBy]}
+          <ChevronDown className="h-3 w-3" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="min-w-[140px]">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="text-xxs">Group by</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {(Object.keys(groupByLabels) as GroupByOption[]).map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option}
+                checked={groupBy === option}
+                onCheckedChange={() => onGroupByChange(option)}
+              >
+                {groupByLabels[option]}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Fix Version filter */}
       {fixVersionOptions.length > 0 && (
