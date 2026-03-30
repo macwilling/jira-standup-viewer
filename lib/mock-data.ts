@@ -61,13 +61,14 @@ export const tickets: Ticket[] = [
     epicName: "Authentication",
     epicColor: "#7C3AED",
     labels: ["frontend", "security"],
+    fixVersions: [],
     description:
       "## Overview\n\nImplement the full OAuth2 authentication flow including:\n\n- Login page with email/password\n- Social login (Google, GitHub)\n- Token refresh logic\n- Session management\n\n### Acceptance Criteria\n\n1. User can log in with email and password\n2. User can log in with Google or GitHub\n3. Sessions persist across page reloads\n4. Token refresh happens transparently",
     lastActivityDate: daysAgo(1),
     isL2: false,
     links: [
-      { targetKey: "PROJ-102", type: "relates to" },
-      { targetKey: "PROJ-104", type: "blocks" },
+      { targetKey: "PROJ-102", type: "relates to", rawDescription: "relates to" },
+      { targetKey: "PROJ-104", type: "blocks", rawDescription: "blocks" },
     ],
     comments: makeComments(
       ["sarah", "Started on the login page UI. OAuth provider configs are set up. Related to PROJ-102 for the design tokens.", 1],
@@ -87,13 +88,14 @@ export const tickets: Ticket[] = [
     epicName: "Design System",
     epicColor: "#2563EB",
     labels: ["frontend", "design-system"],
+    fixVersions: [],
     description:
       "Migrate all hardcoded color values to CSS custom properties. This enables theming support and ensures consistency across the application.\n\n**Files to update:**\n- `globals.css`\n- All component files using direct hex values\n- Tailwind config",
     lastActivityDate: daysAgo(2),
     isL2: false,
     links: [
-      { targetKey: "PROJ-101", type: "relates to" },
-      { targetKey: "PROJ-103", type: "blocks" },
+      { targetKey: "PROJ-101", type: "relates to", rawDescription: "relates to" },
+      { targetKey: "PROJ-103", type: "blocks", rawDescription: "blocks" },
     ],
     comments: makeComments(
       ["sarah", "PR is up: #342. All color tokens migrated. Need a design review.", 2],
@@ -112,12 +114,13 @@ export const tickets: Ticket[] = [
     epicName: "Design System",
     epicColor: "#2563EB",
     labels: ["frontend", "ux"],
+    fixVersions: [],
     description:
       "Add skeleton loading states to all dashboard cards to improve perceived performance. Use the shadcn Skeleton component.\n\nCards that need skeletons:\n- Metrics cards\n- Activity feed\n- Recent tickets list",
     lastActivityDate: daysAgo(3),
     isL2: false,
     links: [
-      { targetKey: "PROJ-102", type: "blocked by" },
+      { targetKey: "PROJ-102", type: "blocked by", rawDescription: "is blocked by" },
     ],
     comments: makeComments(
       ["alex", "I have a reusable skeleton wrapper in the design system branch.", 3]
@@ -135,12 +138,13 @@ export const tickets: Ticket[] = [
     epicName: "Quality",
     epicColor: "#059669",
     labels: ["testing"],
+    fixVersions: [],
     description:
       "Write Playwright E2E tests covering the complete onboarding wizard:\n\n1. Account creation step\n2. Profile setup step\n3. Team invitation step\n4. Dashboard redirect",
     lastActivityDate: daysAgo(1),
     isL2: false,
     links: [
-      { targetKey: "PROJ-101", type: "blocked by" },
+      { targetKey: "PROJ-101", type: "blocked by", rawDescription: "is blocked by" },
     ],
     comments: makeComments(
       ["sarah", "All tests passing. Covers 4 onboarding steps + edge cases.", 1],
@@ -161,13 +165,14 @@ export const tickets: Ticket[] = [
     epicName: "Infrastructure",
     epicColor: "#DC2626",
     labels: ["backend", "security"],
+    fixVersions: [],
     description:
       "## Rate Limiting\n\nImplement rate limiting middleware for all API endpoints:\n\n- **Default**: 100 requests/minute per IP\n- **Auth endpoints**: 10 requests/minute per IP\n- **Webhook endpoints**: 1000 requests/minute per API key\n\nUse Redis for distributed rate limit counters. Return `429 Too Many Requests` with `Retry-After` header.",
     lastActivityDate: daysAgo(10),
     isL2: false,
     links: [
-      { targetKey: "PROJ-106", type: "blocks" },
-      { targetKey: "L2-201", type: "relates to" },
+      { targetKey: "PROJ-106", type: "blocks", rawDescription: "blocks" },
+      { targetKey: "L2-201", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["marcus", "Redis setup is done. Working on the middleware wrapper. See PROJ-106 for the connection pooling dependency.", 10],
@@ -186,12 +191,13 @@ export const tickets: Ticket[] = [
     epicName: "Infrastructure",
     epicColor: "#DC2626",
     labels: ["backend", "performance"],
+    fixVersions: [],
     description:
       "Current connection pool settings are causing timeouts under load. Need to:\n\n1. Tune PgBouncer settings\n2. Add connection pool metrics to monitoring\n3. Implement connection retry logic with exponential backoff",
     lastActivityDate: daysAgo(4),
     isL2: false,
     links: [
-      { targetKey: "PROJ-105", type: "blocked by" },
+      { targetKey: "PROJ-105", type: "blocked by", rawDescription: "is blocked by" },
     ],
     comments: makeComments(
       ["marcus", "Need to benchmark current pool settings before changing anything.", 4],
@@ -210,13 +216,14 @@ export const tickets: Ticket[] = [
     epicName: "Integrations",
     epicColor: "#F59E0B",
     labels: ["backend", "integrations"],
+    fixVersions: [],
     description:
       "Build a reliable webhook delivery system with:\n\n- Event queue (using BullMQ)\n- Retry with exponential backoff (max 5 attempts)\n- Delivery logs and status tracking\n- Signature verification (HMAC-SHA256)",
     lastActivityDate: daysAgo(2),
     isL2: false,
     links: [
-      { targetKey: "L2-201", type: "blocks" },
-      { targetKey: "PROJ-113", type: "relates to" },
+      { targetKey: "L2-201", type: "blocks", rawDescription: "blocks" },
+      { targetKey: "PROJ-113", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["marcus", "PR #358 is up. All retry logic implemented and tested. This unblocks L2-201.", 2],
@@ -237,12 +244,13 @@ export const tickets: Ticket[] = [
     epicName: "Notifications",
     epicColor: "#8B5CF6",
     labels: ["frontend", "notifications"],
+    fixVersions: [],
     description:
       "Build the notification preferences page allowing users to configure:\n\n- Email notifications (per event type)\n- In-app notifications\n- Slack integration toggles\n- Digest frequency (real-time, daily, weekly)\n\nUse the settings page layout pattern from the account settings.",
     lastActivityDate: daysAgo(1),
     isL2: false,
     links: [
-      { targetKey: "PROJ-109", type: "relates to" },
+      { targetKey: "PROJ-109", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["priya", "Working on the toggle matrix UI. Using the Switch component from shadcn.", 1],
@@ -261,12 +269,13 @@ export const tickets: Ticket[] = [
     epicName: "Frontend Architecture",
     epicColor: "#0891B2",
     labels: ["frontend", "refactor"],
+    fixVersions: [],
     description:
       "Replace manual `useEffect` + `useState` data fetching patterns with React Query (TanStack Query).\n\nBenefits:\n- Automatic caching and revalidation\n- Optimistic updates\n- Better loading/error states\n- Reduced boilerplate",
     lastActivityDate: daysAgo(5),
     isL2: false,
     links: [
-      { targetKey: "PROJ-108", type: "relates to" },
+      { targetKey: "PROJ-108", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["priya", "Going to start with the dashboard page as a pilot.", 5],
@@ -285,12 +294,13 @@ export const tickets: Ticket[] = [
     epicName: "Quality",
     epicColor: "#059669",
     labels: ["frontend", "bug"],
+    fixVersions: [],
     description:
       "Dates are showing in UTC instead of the user's local timezone. Need to:\n\n1. Use `Intl.DateTimeFormat` consistently\n2. Store user timezone preference\n3. Apply timezone conversion in all date display components",
     lastActivityDate: daysAgo(1),
     isL2: false,
     links: [
-      { targetKey: "L2-203", type: "relates to" },
+      { targetKey: "L2-203", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["priya", "Fixed across all date components. PR merged.", 1],
@@ -311,6 +321,7 @@ export const tickets: Ticket[] = [
     epicName: "File Management",
     epicColor: "#EA580C",
     labels: ["frontend", "files"],
+    fixVersions: [],
     description:
       "## File Upload Feature\n\nImplement a file upload component with:\n\n- Drag and drop support\n- Progress indicator\n- File type validation (images, PDFs, docs)\n- Max file size: 10MB\n- Multiple file upload\n\nUpload to S3 via presigned URLs from the backend.",
     lastActivityDate: daysAgo(12),
@@ -333,6 +344,7 @@ export const tickets: Ticket[] = [
     epicName: "UX Improvements",
     epicColor: "#06B6D4",
     labels: ["frontend", "ux"],
+    fixVersions: [],
     description:
       "Add keyboard shortcuts:\n\n- `Cmd+K` — Command palette\n- `Cmd+/` — Toggle sidebar\n- `Cmd+N` — New ticket\n- `Esc` — Close modal/drawer\n\nUse a central keyboard shortcut registry.",
     lastActivityDate: daysAgo(6),
@@ -356,13 +368,14 @@ export const tickets: Ticket[] = [
     epicName: "Team Management",
     epicColor: "#4F46E5",
     labels: ["backend", "graphql"],
+    fixVersions: [],
     description:
       "Define and implement the GraphQL schema for team management:\n\n```graphql\ntype Team {\n  id: ID!\n  name: String!\n  members: [TeamMember!]!\n  createdAt: DateTime!\n}\n\ntype TeamMember {\n  user: User!\n  role: TeamRole!\n  joinedAt: DateTime!\n}\n```\n\nInclude mutations for invite, remove, and role change.",
     lastActivityDate: daysAgo(1),
     isL2: false,
     links: [
-      { targetKey: "PROJ-114", type: "blocks" },
-      { targetKey: "PROJ-107", type: "relates to" },
+      { targetKey: "PROJ-114", type: "blocks", rawDescription: "blocks" },
+      { targetKey: "PROJ-107", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["jordan", "Schema is defined. Working on the resolver implementations.", 1],
@@ -381,12 +394,13 @@ export const tickets: Ticket[] = [
     epicName: "Security",
     epicColor: "#BE185D",
     labels: ["backend", "security", "audit"],
+    fixVersions: [],
     description:
       "Track all admin actions in an audit log:\n\n- User management (invite, remove, role change)\n- Settings changes\n- Billing events\n- API key creation/revocation\n\nStore in a dedicated `audit_logs` table with actor, action, target, and metadata.",
     lastActivityDate: daysAgo(3),
     isL2: false,
     links: [
-      { targetKey: "PROJ-113", type: "blocked by" },
+      { targetKey: "PROJ-113", type: "blocked by", rawDescription: "is blocked by" },
     ],
     comments: makeComments(
       ["jordan", "Drafted the DB schema. Will share for review.", 3],
@@ -405,6 +419,7 @@ export const tickets: Ticket[] = [
     epicName: "Infrastructure",
     epicColor: "#DC2626",
     labels: ["devops", "ci"],
+    fixVersions: [],
     description:
       "Optimize the CI pipeline by:\n\n1. Splitting test suites across 4 parallel runners\n2. Caching node_modules and build artifacts\n3. Running lint and type-check in parallel with tests\n\nTarget: reduce CI time from 12 min to under 5 min.",
     lastActivityDate: daysAgo(2),
@@ -429,13 +444,14 @@ export const tickets: Ticket[] = [
     epicName: null,
     epicColor: null,
     labels: ["l2-support", "mobile", "auth"],
+    fixVersions: [],
     description:
       "## Bug Report\n\n**Reported by:** Customer support (3 tickets this week)\n\n**Steps to reproduce:**\n1. Open password reset page on mobile Safari (iOS 17+)\n2. Enter email address\n3. Tap \"Send Reset Link\"\n4. Nothing happens — no loading state, no error\n\n**Expected:** User receives reset email\n\n**Root cause investigation needed.** Likely a form submission issue specific to Safari's handling of `fetch` in form handlers.",
     lastActivityDate: daysAgo(11),
     isL2: true,
     links: [
-      { targetKey: "PROJ-101", type: "relates to" },
-      { targetKey: "PROJ-107", type: "blocked by" },
+      { targetKey: "PROJ-101", type: "relates to", rawDescription: "relates to" },
+      { targetKey: "PROJ-107", type: "blocked by", rawDescription: "is blocked by" },
     ],
     comments: makeComments(
       ["marcus", "Reproduced the issue. Safari is blocking the fetch due to mixed content.", 11],
@@ -454,6 +470,7 @@ export const tickets: Ticket[] = [
     epicName: null,
     epicColor: null,
     labels: ["l2-support", "data", "export"],
+    fixVersions: [],
     description:
       "The CSV export endpoint is not filtering out soft-deleted records. Customers are seeing deleted items in their exports.\n\n**Impact:** Medium — affects data accuracy for all users using the export feature.\n\n**Fix:** Add `WHERE deleted_at IS NULL` to the export query.",
     lastActivityDate: daysAgo(2),
@@ -475,13 +492,14 @@ export const tickets: Ticket[] = [
     epicName: null,
     epicColor: null,
     labels: ["l2-support", "enterprise", "sso"],
+    fixVersions: [],
     description:
       "Enterprise customers using SAML SSO report that dashboard widgets show a perpetual loading state after login.\n\n**Affected orgs:** 3 enterprise accounts\n\n**Symptoms:**\n- Login works fine\n- Main navigation loads\n- Dashboard widgets show spinners indefinitely\n- Browser console shows 403 errors on `/api/widgets` endpoint\n\nLikely a session/token scope issue for SSO sessions.",
     lastActivityDate: daysAgo(1),
     isL2: true,
     links: [
-      { targetKey: "PROJ-110", type: "relates to" },
-      { targetKey: "PROJ-101", type: "relates to" },
+      { targetKey: "PROJ-110", type: "relates to", rawDescription: "relates to" },
+      { targetKey: "PROJ-101", type: "relates to", rawDescription: "relates to" },
     ],
     comments: makeComments(
       ["priya", "Found the issue — SSO tokens are missing the `widgets:read` scope.", 1],

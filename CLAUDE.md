@@ -42,9 +42,20 @@ SWR (5min poll) → /api/jira/tickets → Jira Cloud REST API
 - **`components/SearchBar.tsx`** — Command palette (`cmdk`) with `/` keyboard shortcut.
 - **`components/ui/`** — shadcn/ui primitives (do not modify directly; regenerate via shadcn CLI).
 
+### Progress Page (`/progress`)
+
+A PM-facing view for tracking story-level progress and identifying blockers. See `docs/progress-page.md` for full details.
+
+- **`lib/progress-utils.ts`** — Builds flat `StoryCard[]` from sprint tickets. Reconstructs Story→Task hierarchy from Jira issue links (not parent/child — tasks are *linked* to stories via inconsistent link types). Uses heuristic: any non-blocking link between a Story and a Task = child relationship.
+- **`components/progress/`** — `StoryCard`, `TaskChipBadge`, `FilterBar`, `MiniProgressBar`.
+- **Sprint-aware clustering** — If any ticket in a story's cluster (the story or any linked task) is in the sprint, the entire story appears with all its tasks.
+- **Enriched link data** — `TicketLinkDef` includes `targetType`, `targetSummary`, `targetStatus`, `targetStatusCategory`, `rawDescription`. This lets us show task chips for linked tickets not in the sprint without extra API calls.
+- **Scope toggle** — `/api/jira/tickets?scope=all-open` overrides JQL to fetch all non-closed issues across the project.
+
 ### Pages
 
 - `/` — Main dashboard (client component)
+- `/progress` — Story progress view with filters (scope, fix version, epic)
 - `/settings` — Configuration UI for JQL filter, L2 labels, sprint field
 
 ## Conventions

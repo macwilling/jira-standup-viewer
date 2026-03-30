@@ -42,6 +42,8 @@ export interface JiraIssueLink {
     fields: {
       summary: string;
       status: JiraStatus;
+      issuetype?: JiraIssueType;
+      priority?: JiraPriority;
     };
   };
   outwardIssue?: {
@@ -49,6 +51,8 @@ export interface JiraIssueLink {
     fields: {
       summary: string;
       status: JiraStatus;
+      issuetype?: JiraIssueType;
+      priority?: JiraPriority;
     };
   };
 }
@@ -109,6 +113,7 @@ export interface JiraIssueFields {
       status: JiraStatus;
     };
   };
+  fixVersions?: { id: string; name: string }[];
   customfield_10014?: string; // Epic Link (classic projects)
   // Sprint info (commonly customfield_10020)
   customfield_10020?: JiraSprint[] | null;

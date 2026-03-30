@@ -1,0 +1,363 @@
+"use client";
+
+import { useState, useMemo, useCallback } from "react";
+import useSWR from "swr";
+import { ArrowLeft, Search, Loader2, Settings, LogOut, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { TicketDrawer } from "@/components/TicketDrawer";
+import { SearchBar } from "@/components/SearchBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { FilterBar, ScopeFilter } from "@/components/progress/FilterBar";
+import { StoryCard } from "@/components/progress/StoryCard";
+import { TaskChipBadge } from "@/components/progress/TaskChipBadge";
+import { useTicketData } from "@/lib/ticket-data-context";
+import { buildProgressData } from "@/lib/progress-utils";
+import { isStale as isStaleUtil } from "@/lib/utils";
+import { getEpicColor } from "@/lib/utils";
+import { Ticket, TicketStatus, TeamMember } from "@/lib/types";
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `API error ${res.status}`);
+  }
+  return res.json();
+};
+
+export default function ProgressPage() {
+  const ctx = useTicketData();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+  };
+
+  // --- Filter state ---
+  const [scope, setScope] = useState<ScopeFilter>("sprint");
+  const [selectedFixVersions, setSelectedFixVersions] = useState<Set<string>>(new Set());
+  const [selectedEpics, setSelectedEpics] = useState<Set<string>>(new Set());
+
+  // --- Data fetching ---
+  const { data: allOpenData, error: allOpenError, isLoading: allOpenLoading, mutate: allOpenMutate } = useSWR(
+    scope === "all-open" ? "/api/jira/tickets?scope=all-open" : null,
+    fetcher,
+    { revalidateOnFocus: false, errorRetryCount: 2 }
+  );
+
+  const tickets: Ticket[] = scope === "all-open"
+    ? (allOpenData?.tickets || [])
+    : ctx.tickets;
+  const teamMembers: TeamMember[] = scope === "all-open"
+    ? (allOpenData?.teamMembers || ctx.teamMembers)
+    : ctx.teamMembers;
+  const isLoading = scope === "all-open" ? allOpenLoading : ctx.isLoading;
+  const error = scope === "all-open" ? allOpenError?.message : ctx.error;
+
+  // --- Refresh ---
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = useCallback(() => {
+    if (refreshing) return;
+    setRefreshing(true);
+    const minSpin = new Promise((r) => setTimeout(r, 600));
+    const fetched = scope === "all-open" ? allOpenMutate() : ctx.refresh();
+    Promise.all([minSpin, fetched]).finally(() => setRefreshing(false));
+  }, [refreshing, scope, allOpenMutate, ctx]);
+
+  // --- Derive filter options ---
+  const fixVersionOptions = useMemo(() => {
+    const versions = new Set<string>();
+    for (const t of tickets) {
+      for (const v of t.fixVersions) versions.add(v);
+    }
+    return [...versions].sort();
+  }, [tickets]);
+
+  const epicOptions = useMemo(() => {
+    const epics = new Set<string>();
+    for (const t of tickets) {
+      if (t.epicName) epics.add(t.epicName);
+    }
+    return [...epics].sort();
+  }, [tickets]);
+
+  // --- Apply client-side filters ---
+  const filteredTickets = useMemo(() => {
+    let result = tickets;
+    if (selectedFixVersions.size > 0) {
+      result = result.filter((t) =>
+        t.fixVersions.some((v) => selectedFixVersions.has(v))
+      );
+    }
+    if (selectedEpics.size > 0) {
+      result = result.filter((t) =>
+        t.epicName !== null && selectedEpics.has(t.epicName)
+      );
+    }
+    return result;
+  }, [tickets, selectedFixVersions, selectedEpics]);
+
+  // --- Build progress data ---
+  const progressData = useMemo(
+    () => buildProgressData(filteredTickets, isStaleUtil),
+    [filteredTickets]
+  );
+
+  // --- Group stories by epic for display ---
+  const epicGroups = useMemo(() => {
+    const groups: { epicName: string; epicColor: string | null; stories: typeof progressData.stories }[] = [];
+    const map = new Map<string, typeof progressData.stories>();
+
+    for (const story of progressData.stories) {
+      const name = story.epicName || "No Epic";
+      if (!map.has(name)) map.set(name, []);
+      map.get(name)!.push(story);
+    }
+
+    for (const [name, stories] of map) {
+      groups.push({
+        epicName: name,
+        epicColor: stories[0]?.epicColor || null,
+        stories,
+      });
+    }
+
+    return groups;
+  }, [progressData.stories]);
+
+  // --- Ticket drawer state ---
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [ticketHistory, setTicketHistory] = useState<Ticket[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const handleTicketSelect = useCallback((ticket: Ticket) => {
+    setSelectedTicket((prev) => {
+      if (prev && prev.key !== ticket.key) {
+        setTicketHistory((h) => {
+          if (h.length > 0 && h[h.length - 1].key === prev.key) return h;
+          return [...h, prev];
+        });
+      }
+      return ticket;
+    });
+  }, []);
+
+  const handleTaskChipClick = useCallback((key: string) => {
+    // Try to find in sprint data first, then fetch
+    const ticket = tickets.find((t) => t.key === key);
+    if (ticket) {
+      handleTicketSelect(ticket);
+    } else {
+      ctx.fetchTicket(key).then((t) => {
+        if (t) handleTicketSelect(t);
+      });
+    }
+  }, [tickets, handleTicketSelect, ctx]);
+
+  const handleTicketBack = useCallback(() => {
+    setTicketHistory((h) => {
+      if (h.length === 0) return h;
+      const prev = h[h.length - 1];
+      setSelectedTicket(prev);
+      return h.slice(0, -1);
+    });
+  }, []);
+
+  const handleBreadcrumbNav = useCallback((index: number) => {
+    setTicketHistory((h) => {
+      const target = h[index];
+      setSelectedTicket(target);
+      return h.slice(0, index);
+    });
+  }, []);
+
+  const handleStatusChange = useCallback(
+    (ticket: Ticket, status: TicketStatus) => {
+      void ticket;
+      void status;
+    },
+    []
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between h-11 px-4">
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Link>
+            <h1 className="text-sm font-semibold tracking-tight">Progress</h1>
+          </div>
+
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex items-center gap-2 px-2.5 py-1 h-7 rounded-md border bg-muted/50 text-muted-foreground hover:bg-muted transition-colors w-full max-w-sm mx-4"
+          >
+            <Search className="h-3.5 w-3.5 shrink-0" />
+            <span className="text-xs">Search tickets...</span>
+            <kbd className="ml-auto text-xxs bg-background px-1.5 py-0 rounded border font-mono">/</kbd>
+          </button>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+              title="Refresh tickets"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+            <ThemeToggle />
+            <Link
+              href="/settings"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Settings"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Filter bar */}
+      <div className="border-b bg-background px-4 py-2">
+        <div className="max-w-5xl mx-auto">
+          <FilterBar
+            scope={scope}
+            onScopeChange={setScope}
+            fixVersionOptions={fixVersionOptions}
+            selectedFixVersions={selectedFixVersions}
+            onFixVersionsChange={setSelectedFixVersions}
+            epicOptions={epicOptions}
+            selectedEpics={selectedEpics}
+            onEpicsChange={setSelectedEpics}
+          />
+        </div>
+      </div>
+
+      {/* Loading state */}
+      {isLoading && tickets.length === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Loading tickets...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && (
+        <div className="px-4 py-3">
+          <div className="max-w-5xl mx-auto rounded-md border border-destructive/50 bg-destructive/5 p-3">
+            <p className="text-sm text-destructive">Failed to load tickets: {error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      {(progressData.stories.length > 0 || progressData.orphanTasks.length > 0) && (
+        <main className="flex-1 px-4 py-4">
+          <div className="flex flex-col gap-2 max-w-5xl mx-auto">
+            {epicGroups.map((group) => (
+              <div key={group.epicName}>
+                {/* Epic group header */}
+                <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: getEpicColor(group.epicName, group.epicColor) }}
+                  />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {group.epicName}
+                  </span>
+                  <span className="text-xxs text-muted-foreground">
+                    {group.stories.length} {group.stories.length === 1 ? "story" : "stories"}
+                  </span>
+                </div>
+                {/* Story cards */}
+                <div className="flex flex-col gap-2">
+                  {group.stories.map((card) => (
+                    <StoryCard
+                      key={card.ticket.key}
+                      card={card}
+                      onTicketSelect={handleTicketSelect}
+                      onTaskChipClick={handleTaskChipClick}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Orphan tasks */}
+            {progressData.orphanTasks.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-slate-400" />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Ungrouped Tasks
+                  </span>
+                  <span className="text-xxs text-muted-foreground">
+                    {progressData.orphanTasks.length}
+                  </span>
+                </div>
+                <div className="rounded-lg border bg-card px-4 py-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {progressData.orphanTasks.map((chip) => (
+                      <TaskChipBadge
+                        key={chip.key}
+                        chip={chip}
+                        onClick={() => handleTaskChipClick(chip.key)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && tickets.length > 0 && progressData.stories.length === 0 && progressData.orphanTasks.length === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">No tickets match the current filters.</p>
+        </div>
+      )}
+
+      {searchOpen && (
+        <SearchBar
+          open={searchOpen}
+          onOpenChange={setSearchOpen}
+          tickets={tickets}
+          onSelect={handleTicketSelect}
+        />
+      )}
+
+      <TicketDrawer
+        ticket={selectedTicket}
+        teamMembers={teamMembers}
+        allTickets={tickets}
+        onClose={() => { setSelectedTicket(null); setTicketHistory([]); }}
+        onStatusChange={handleStatusChange}
+        onTicketSelect={handleTicketSelect}
+        ticketHistory={ticketHistory}
+        onBack={handleTicketBack}
+        onBreadcrumbNav={handleBreadcrumbNav}
+      />
+    </div>
+  );
+}

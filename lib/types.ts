@@ -21,6 +21,11 @@ export type LinkType = "blocks" | "blocked by" | "relates to" | "duplicates";
 export interface TicketLinkDef {
   targetKey: string;
   type: LinkType;
+  rawDescription: string;
+  targetType?: TicketType;
+  targetSummary?: string;
+  targetStatus?: string;
+  targetStatusCategory?: StatusCategory;
 }
 
 export interface Ticket {
@@ -35,6 +40,7 @@ export interface Ticket {
   epicName: string | null;
   epicColor: string | null;
   labels: string[];
+  fixVersions: string[];
   description: string;
   lastActivityDate: string;
   isL2: boolean;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Search, Loader2, Settings, LogOut, RefreshCw } from "lucide-react";
+import { Search, Loader2, Settings, LogOut, RefreshCw, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TeamCard } from "@/components/TeamCard";
@@ -149,6 +149,13 @@ export default function Home() {
           </button>
 
           <div className="flex items-center gap-1 shrink-0">
+            <Link
+              href="/progress"
+              className="inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              title="Progress"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+            </Link>
             <button
               onClick={handleRefresh}
               disabled={refreshing}

@@ -261,15 +261,27 @@ export function mapIssueLinks(links: JiraIssueLink[]): TicketLinkDef[] {
 
   for (const link of links) {
     if (link.outwardIssue) {
+      const f = link.outwardIssue.fields;
       result.push({
         targetKey: link.outwardIssue.key,
         type: mapLinkType(link.type.outward),
+        rawDescription: link.type.outward,
+        targetType: f.issuetype ? mapJiraType(f.issuetype.name) : undefined,
+        targetSummary: f.summary,
+        targetStatus: f.status.name,
+        targetStatusCategory: mapJiraStatusCategory(f.status.statusCategory?.key || "new"),
       });
     }
     if (link.inwardIssue) {
+      const f = link.inwardIssue.fields;
       result.push({
         targetKey: link.inwardIssue.key,
         type: mapLinkType(link.type.inward),
+        rawDescription: link.type.inward,
+        targetType: f.issuetype ? mapJiraType(f.issuetype.name) : undefined,
+        targetSummary: f.summary,
+        targetStatus: f.status.name,
+        targetStatusCategory: mapJiraStatusCategory(f.status.statusCategory?.key || "new"),
       });
     }
   }
@@ -431,6 +443,7 @@ export function mapJiraIssue(
     epicName,
     epicColor,
     labels: fields.labels,
+    fixVersions: (fields.fixVersions || []).map((v) => v.name),
     description: adfToMarkdown(fields.description, attachmentMap),
     lastActivityDate: fields.updated,
     isL2,

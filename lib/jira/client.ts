@@ -13,6 +13,7 @@ const BASE_FIELDS = [
   "comment",
   "attachment",
   "parent",
+  "fixVersions",
   "customfield_10014", // Epic Link (classic)
   "customfield_10011", // Epic color
 ];
